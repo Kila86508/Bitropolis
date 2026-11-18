@@ -6,6 +6,13 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8765", "--directory", "dist"],
       "port": 8765
+    },
+    {
+      "name": "bitropolis-dist-alt",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8767", "--directory", "dist"],
+      "port": 8767,
+      "autoPort": false
     }
   ]
 }

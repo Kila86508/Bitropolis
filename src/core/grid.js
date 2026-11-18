@@ -4,21 +4,25 @@
 // les avenues les plus empruntées montent jusqu'au niveau N8.
 import { makeRng } from './rules.js';
 import { buildTree } from './layout.js';
-import { growthOf, footprint, MONUMENTS, ROAD_TIERS } from './catalog.js';
+import { growthOf, footprint, MONUMENTS, ROAD_TIERS, TREES, VEHICLES } from './catalog.js';
 
 export const CELL = 4; // une case du pack = 4 m
 const MAX_LEAF_W = 16;
 
 // ---- Îlot de fichiers : rangées dos à dos, une route intérieure entre chaque paire de rangées.
 // Rangée paire : façades vers -z (route du haut) ; rangée impaire : façades vers +z (route du bas).
+// Des cases libres sont glissées entre certains bâtiments (jardins, placettes) pour aérer les rangées.
+const GAP_RATE = 0.16;
 function gdLeaf(node, items) {
+  const rng = makeRng('leaf:' + node.path + ':' + items.length);
   const sorted = items.slice().sort((a, b) => b.d - a.d || b.w - a.w || b.score - a.score || (a.path < b.path ? -1 : 1));
-  const area = sorted.reduce((s, it) => s + it.w * it.d, 0);
+  const area = sorted.reduce((s, it) => s + it.w * it.d, 0) * (1 + GAP_RATE);
   const maxW = Math.max(...sorted.map((it) => it.w));
   const W = Math.max(maxW, Math.min(MAX_LEAF_W, Math.ceil(Math.sqrt(area * 1.7))));
   const rows = [];
   let row = null;
   for (const it of sorted) {
+    if (row && row.items.length && rng() < GAP_RATE && row.used + 1 + it.w <= W) { row.items.push({ gap: true, w: 1, d: 1 }); row.used += 1; }
     if (!row || row.used + it.w > W) { row = { items: [], used: 0, d: 0 }; rows.push(row); }
     row.items.push(it); row.used += it.w; row.d = Math.max(row.d, it.d);
   }
@@ -83,6 +87,7 @@ function gdEmit(n, ox, oz, out) {
       const top = r % 2 === 0;
       let x = ox;
       for (const it of row.items) {
+        if (it.gap) { x += 1; continue; }
         const iz = top ? z : z + row.d - it.d;
         out.items.push({ ...it, x, z: iz, facing: top ? 2 : 0, leaf: out.leaves.length - 1 });
         block.ids.push(it.id);
@@ -332,16 +337,60 @@ export function layoutGrid(analysis) {
     roundabouts.push({ x: wx(f.x), z: wz(f.z), cx: f.x, cz: f.z, radius: CELL * 0.5, crossWidth: CELL, traffic: Math.round(f.t), labels: f.pair ? f.pair.label : ['/', '/'], model: MONUMENTS[roundabouts.length % MONUMENTS.length] });
     monumentCells.add(f.z * cols + f.x);
   }
+  // Mobilier des cases libres : au bord d'une route, placettes (banc, lampadaire, poubelle), jardins,
+  // petits parkings ; à l'arrière, jardins, arbres ou simple pelouse. Pas de forêt compacte.
+  const decor = [], paved = [];
+  const put = (model, x, z, rot, s = 1) => decor.push({ model, x, z, rot, s });
+  const tree = (x, z) => {
+    const r = rng();
+    if (r < 0.62) put(TREES[Math.floor(rng() * TREES.length)], x, z, rng() * 6.28, 1.05 + rng() * 0.5);
+    else put(r < 0.82 ? 'fp_tree2' : 'fp_tree6', x, z, rng() * 6.28, 0.85 + rng() * 0.35);
+  };
+  const off = () => (rng() - 0.5) * CELL * 0.5;
   for (const g of greens) {
     if (monumentCells.has(g.cz * cols + g.cx)) continue;
-    const n = 1 + Math.floor(rng() * 3);
-    for (let k = 0; k < n; k++) trees.push({ x: g.x + (rng() - 0.5) * CELL * 0.7, z: g.z + (rng() - 0.5) * CELL * 0.7, s: 0.8 + rng() * 0.5, kind: Math.floor(rng() * 6) });
+    let road = -1;
+    GD_DIRS.forEach(([dx, dz], i) => { if (road < 0 && isRoad(g.cx + dx, g.cz + dz)) road = i; });
+    const r = rng();
+    if (road >= 0) {
+      const [dx, dz] = GD_DIRS[road];
+      const edgeX = g.x + dx * CELL * 0.32, edgeZ = g.z + dz * CELL * 0.32;      // bord côté route
+      const along = dz !== 0 ? 0 : Math.PI / 2;                                  // parallèle à la route
+      const tx = dz !== 0 ? 1 : 0, tz = dz !== 0 ? 0 : 1;                        // direction le long de la route
+      if (r < 0.32) {                       // placette
+        paved.push(g.cz * cols + g.cx);
+        put('fp_bench2', edgeX - tx * CELL * 0.12, edgeZ - tz * CELL * 0.12, along + (dz > 0 || dx > 0 ? Math.PI : 0));
+        put('fp_streetLight', edgeX + tx * CELL * 0.3, edgeZ + tz * CELL * 0.3, along);
+        if (rng() < 0.6) put('fp_garbageBin', edgeX + tx * CELL * 0.14, edgeZ + tz * CELL * 0.14, rng() * 6.28);
+        tree(g.x - dx * CELL * 0.2 + off() * 0.4, g.z - dz * CELL * 0.2 + off() * 0.4);
+      } else if (r < 0.52) {                // jardin
+        put('fp_garden1', g.x, g.z, Math.floor(rng() * 4) * Math.PI / 2);
+        if (rng() < 0.4) put('fp_fireHydrant', edgeX + tx * CELL * 0.38, edgeZ + tz * CELL * 0.38, rng() * 6.28);
+      } else if (r < 0.66) {                // petit parking
+        paved.push(g.cz * cols + g.cx);
+        const n = 1 + Math.floor(rng() * 2);
+        for (let k = 0; k < n; k++) {
+          const car = rng() < 0.3 ? 'fp_redCar' : VEHICLES.car[Math.floor(rng() * VEHICLES.car.length)];
+          const t = (k - (n - 1) / 2) * CELL * 0.34;
+          put(car, g.x + tx * t, g.z + tz * t, along + Math.PI / 2 + (rng() < 0.5 ? Math.PI : 0), car === 'fp_redCar' ? 1 : 2.2);
+        }
+        if (rng() < 0.5) put('fp_trafficCone', edgeX + tx * CELL * 0.4, edgeZ + tz * CELL * 0.4, rng() * 6.28);
+      } else if (r < 0.9) {                 // arbres d'alignement
+        tree(edgeX - dx * CELL * 0.1 + tx * CELL * 0.22, edgeZ - dz * CELL * 0.1 + tz * CELL * 0.22);
+        if (rng() < 0.55) tree(edgeX - dx * CELL * 0.1 - tx * CELL * 0.22, edgeZ - dz * CELL * 0.1 - tz * CELL * 0.22);
+      }
+    } else {
+      if (r < 0.3) put('fp_garden1', g.x, g.z, Math.floor(rng() * 4) * Math.PI / 2);
+      else if (r < 0.62) { tree(g.x + off(), g.z + off()); if (rng() < 0.4) tree(g.x + off(), g.z + off()); }
+      else if (r < 0.72) { put('fp_garbageBin', g.x + off(), g.z + off(), rng() * 6.28); put(rng() < 0.5 ? 'fp_trashBag1' : 'fp_trashBag2', g.x + off(), g.z + off(), rng() * 6.28); }
+    }
   }
+  for (const d of decor) if (TREES.includes(d.model)) trees.push({ x: d.x, z: d.z, s: d.s, kind: TREES.indexOf(d.model) });
 
   return {
     grid: true, cell: CELL, cols, rows, origin: [ox, oz],
     size: Math.max(cols, rows) * CELL, ring: 0,
-    roads: segments, roadTiles, blocks, districts, lots, roundabouts, trees, greens,
+    roads: segments, roadTiles, blocks, districts, lots, roundabouts, trees, greens, decor, paved,
     districtNames: [...topIndex.keys()], maxTraffic: maxT,
     cellAt: (x, z) => grid[z * cols + x]
   };

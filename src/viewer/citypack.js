@@ -81,12 +81,12 @@ export function buildPackCity(city, analysis, material, rng) {
   const wx = (x) => ox + (x + 0.5) * CELL, wz = (z) => oz + (z + 0.5) * CELL;
 
   // --- sol : dalles urbaines sous les bâtiments et les routes, dalles vertes sur les places
-  const tops = new Map();
+  const tops = new Map(), paved = new Set(city.paved || []);
   for (const l of city.lots) if (l) for (let j = 0; j < l.d; j++) for (let i = 0; i < l.w; i++) tops.set((l.cz + j) * city.cols + l.cx + i, l.district);
   for (let z = 0; z < city.rows; z++) for (let x = 0; x < city.cols; x++) {
     const type = city.cellAt(x, z), k = z * city.cols + x;
     let model;
-    if (type === 0) model = GROUNDS[2 + ((x + z) & 1)];
+    if (type === 0) model = paved.has(k) ? GROUNDS[(x + z) & 1] : GROUNDS[2 + ((x + z) & 1)];
     else if (type === 2) model = GROUNDS[(tops.get(k) ?? 0) & 1 ? 1 : 0];
     else model = GROUNDS[0];
     I.add(model, wx(x), GROUND_Y, wz(z), 0);
@@ -129,8 +129,12 @@ export function buildPackCity(city, analysis, material, rng) {
     if (ref) attach(buildings[f.id], lot.model);
   }
 
-  // --- arbres des places et monuments
-  for (const t of city.trees) I.add(TREES[t.kind % TREES.length], t.x, CITY_Y, t.z, t.s * 9, CELL * t.s * 1.2);
+  // --- mobilier des cases libres (arbres, bancs, lampadaires, jardins, voitures garées) et monuments
+  if (city.decor) {
+    for (const d of city.decor) if (packModel('city', d.model)) I.add(d.model, d.x, CITY_Y, d.z, d.rot, CELL * d.s);
+  } else {
+    for (const t of city.trees) I.add(TREES[t.kind % TREES.length], t.x, CITY_Y, t.z, t.s * 9, CELL * t.s * 1.2);
+  }
   const monuments = city.roundabouts.map((m) => {
     I.add(m.model, m.x, CITY_Y, m.z, Math.PI);
     const mon = { ...m, box: packBox(m.model, m.x, m.z, Math.PI, CELL) };

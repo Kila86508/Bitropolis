@@ -75,8 +75,8 @@ test('évolution entre deux scans : grandi, nouveau, démoli', () => {
 });
 
 test('tous les modèles du catalogue existent dans le pack (si le pack est présent)', (t) => {
-  const dir = new URL('../FULL_VERSION_250_MODELS/GLB/', import.meta.url);
-  if (!fs.existsSync(dir)) return t.skip('pack absent');
+  const dir = [new URL('../Asset/FULL_VERSION_250_MODELS/GLB/', import.meta.url), new URL('../FULL_VERSION_250_MODELS/GLB/', import.meta.url)].find((d) => fs.existsSync(d));
+  if (!dir) return t.skip('pack absent');
   const have = new Set(fs.readdirSync(dir).flatMap((c) => { try { return fs.readdirSync(new URL(c + '/', dir)); } catch { return []; } }).map((f) => f.replace(/\.glb$/, '')));
   for (const m of packModelNames()) assert.ok(have.has(m), m);
   for (const chain of Object.values(CHAINS)) assert.ok(chain.length >= 5);

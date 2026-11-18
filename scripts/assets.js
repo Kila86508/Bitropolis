@@ -7,12 +7,13 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { packModelNames } from '../src/core/catalog.js';
+import { packModelNames, PROPS } from '../src/core/catalog.js';
 import { obfName, obfXor } from '../src/core/obf.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const LANDSCAPE_DIRS = [path.join(ROOT, 'Asset/models'), path.join(ROOT, 'Asset/model')];
-export const CITY_PACK_DIR = path.join(ROOT, 'FULL_VERSION_250_MODELS/GLB');
+export const CITY_PACK_DIR = [path.join(ROOT, 'Asset/FULL_VERSION_250_MODELS/GLB'), path.join(ROOT, 'FULL_VERSION_250_MODELS/GLB')].find((d) => fs.existsSync(d)) || path.join(ROOT, 'Asset/FULL_VERSION_250_MODELS/GLB');
+export const PROPS_DIR = path.join(ROOT, 'Asset/Maison/obj free city pack');
 
 // --- Décodeur PNG minimal (8 bits, non entrelacé : gris, RGB, palette, RGBA)
 export function decodePNG(buf) {
@@ -173,6 +174,50 @@ export function readGLB(file) {
   return { prims, parts, fx };
 }
 
+// --- Lecture d'un .obj (+ .mtl pour les couleurs « Kd ») : recentré au sol, mis à l'échelle de la grille.
+export function readOBJ(file, scale = 1) {
+  const dir = path.dirname(file);
+  const text = fs.readFileSync(file, 'utf8');
+  const kd = new Map();
+  const mtl = /^mtllib\s+(.+)$/m.exec(text);
+  if (mtl && fs.existsSync(path.join(dir, mtl[1].trim()))) {
+    let cur = null;
+    for (const line of fs.readFileSync(path.join(dir, mtl[1].trim()), 'utf8').split(/\r?\n/)) {
+      const t = line.trim().split(/\s+/);
+      if (t[0] === 'newmtl') cur = t.slice(1).join(' ');
+      else if (t[0] === 'Kd' && cur) kd.set(cur, [+t[1], +t[2], +t[3]]);
+    }
+  }
+  const V = [];
+  const groups = new Map(); // matériau → triangles (indices globaux)
+  let mat = '';
+  for (const line of text.split(/\r?\n/)) {
+    if (line.startsWith('v ')) { const t = line.trim().split(/\s+/); V.push(+t[1], +t[2], +t[3]); }
+    else if (line.startsWith('usemtl')) mat = line.slice(6).trim();
+    else if (line.startsWith('f ')) {
+      const ids = line.trim().split(/\s+/).slice(1).map((t) => { const v = parseInt(t, 10); return v < 0 ? V.length / 3 + v : v - 1; });
+      if (!groups.has(mat)) groups.set(mat, []);
+      const g = groups.get(mat);
+      for (let k = 1; k + 1 < ids.length; k++) g.push(ids[0], ids[k], ids[k + 1]);
+    }
+  }
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < V.length; i += 3) for (let c = 0; c < 3; c++) { min[c] = Math.min(min[c], V[i + c]); max[c] = Math.max(max[c], V[i + c]); }
+  const cx = (min[0] + max[0]) / 2, cz = (min[2] + max[2]) / 2, y0 = min[1];
+  const prims = [];
+  for (const [m, tris] of groups) {
+    const map = new Map(), pos = [], idx = [];
+    for (const v of tris) {
+      let k = map.get(v);
+      if (k === undefined) { k = pos.length / 3; map.set(v, k); pos.push((V[v * 3] - cx) * scale, (V[v * 3 + 1] - y0) * scale, (V[v * 3 + 2] - cz) * scale); }
+      idx.push(k);
+    }
+    const c = kd.get(m) || [0.7, 0.7, 0.7];
+    prims.push({ pos: Float64Array.from(pos), idx: Float64Array.from(idx), uv: null, image: null, factor: [c[0], c[1], c[2], 1], lit: /light|lamp|bulb/i.test(m) && !/pole|post|base/i.test(m) ? 2 : 0, material: m });
+  }
+  return { prims, parts: [], fx: [] };
+}
+
 // --- Un pack = plusieurs modèles partageant une palette, sérialisés dans un seul binaire gzip.
 class PackWriter {
   constructor() { this.palette = []; this.paletteIndex = new Map(); this.chunks = []; this.size = 0; this.models = {}; }
@@ -191,8 +236,8 @@ class PackWriter {
     if (pad) { this.chunks.push(new Uint8Array(pad)); this.size += pad; }
     return off;
   }
-  add(name, file) {
-    const { prims, parts, fx } = readGLB(file);
+  add(name, file, scale = 1) {
+    const { prims, parts, fx } = file.endsWith('.obj') ? readOBJ(file, scale) : readGLB(file);
     if (!this.addPrims(name, prims, [...prims, ...parts.flatMap((pt) => pt.prims)])) return false;
     const info = this.models[name];
     if (parts.length) {
@@ -288,6 +333,11 @@ export function packCity({ dir = CITY_PACK_DIR } = {}) {
     if (index.has(name)) w.add(name, index.get(name)); else missing.push(name);
   }
   if (missing.length) console.warn('⚠️  Modèles absents du pack :', missing.join(', '));
+  // accessoires urbains (.obj + .mtl)
+  for (const [name, scale] of Object.entries(PROPS)) {
+    const f = path.join(PROPS_DIR, name + '.obj');
+    if (fs.existsSync(f)) w.add('fp_' + name, f, scale);
+  }
   return Object.keys(w.models).length ? w.finish() : null;
 }
 
