@@ -75,6 +75,11 @@ export const PROPS = {
   bench2: 0.05, fireHydrant: 0.05, garbageBin: 0.045, trashBag1: 0.045, trashBag2: 0.045, trafficCone: 0.045,
   streetLight: 0.045, tree2: 0.1, tree6: 0.1, garden1: 0.07, redCar: 0.065
 };
+// Accessoires du kit de routes (Asset/Maison/road) : nom → échelle (mètres du kit → cases du pack,
+// réduite pour s'accorder aux proportions « maquette » du pack)
+export const KIT_PROPS = {
+  lamp_1: 0.065, lamp_2: 0.065, hazzard_cone_1: 0.13, traffic_barell_1: 0.08, Tree3: 0.09, Tree4: 0.08, tree_1_a: 0.13, bush_1: 0.12
+};
 export const VEHICLES = {
   car: ['Car_Blue', 'Car_Coral', 'Car_Sand', 'Car_Silver', 'Car_Teal'],
   truck: ['Freight_Truck_Blue', 'Freight_Truck_Coral', 'Freight_Truck_Sand', 'Freight_Truck_Silver', 'Freight_Truck_Teal'],

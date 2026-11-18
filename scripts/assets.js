@@ -7,13 +7,14 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { packModelNames, PROPS } from '../src/core/catalog.js';
+import { packModelNames, PROPS, KIT_PROPS } from '../src/core/catalog.js';
 import { obfName, obfXor } from '../src/core/obf.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const LANDSCAPE_DIRS = [path.join(ROOT, 'Asset/models'), path.join(ROOT, 'Asset/model')];
 export const CITY_PACK_DIR = [path.join(ROOT, 'Asset/FULL_VERSION_250_MODELS/GLB'), path.join(ROOT, 'FULL_VERSION_250_MODELS/GLB')].find((d) => fs.existsSync(d)) || path.join(ROOT, 'Asset/FULL_VERSION_250_MODELS/GLB');
 export const PROPS_DIR = path.join(ROOT, 'Asset/Maison/obj free city pack');
+export const ROAD_KIT_DIR = path.join(ROOT, 'Asset/Maison/road/PLUS/gltf');
 
 // --- Décodeur PNG minimal (8 bits, non entrelacé : gris, RGB, palette, RGBA)
 export function decodePNG(buf) {
@@ -246,6 +247,11 @@ class PackWriter {
   }
   add(name, file, scale = 1) {
     const { prims, parts, fx } = file.endsWith('.obj') ? readOBJ(file, scale) : readGLB(file);
+    if (scale !== 1 && !file.endsWith('.obj')) {
+      for (const p of [...prims, ...parts.flatMap((pt) => pt.prims)]) for (let k = 0; k < p.pos.length; k++) p.pos[k] *= scale;
+      for (const pt of parts) for (const i of [12, 13, 14]) pt.pivot[i] *= scale;
+      for (const e of fx) e.p = e.p.map((v) => v * scale);
+    }
     if (!this.addPrims(name, prims, [...prims, ...parts.flatMap((pt) => pt.prims)])) return false;
     const info = this.models[name];
     if (parts.length) {
@@ -351,6 +357,11 @@ export function packCity({ dir = CITY_PACK_DIR } = {}) {
   for (const [name, scale] of Object.entries(PROPS)) {
     const f = path.join(PROPS_DIR, name + '.obj');
     if (fs.existsSync(f)) w.add('fp_' + name, f, scale);
+  }
+  // accessoires du kit de routes (.glb)
+  for (const [name, scale] of Object.entries(KIT_PROPS)) {
+    const f = path.join(ROAD_KIT_DIR, name + '.glb');
+    if (fs.existsSync(f)) w.add('rk_' + name, f, scale);
   }
   return Object.keys(w.models).length ? w.finish() : null;
 }

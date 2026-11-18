@@ -343,8 +343,10 @@ export function layoutGrid(analysis) {
   const put = (model, x, z, rot, s = 1) => decor.push({ model, x, z, rot, s });
   const tree = (x, z) => {
     const r = rng();
-    if (r < 0.62) put(TREES[Math.floor(rng() * TREES.length)], x, z, rng() * 6.28, 1.05 + rng() * 0.5);
-    else put(r < 0.82 ? 'fp_tree2' : 'fp_tree6', x, z, rng() * 6.28, 0.85 + rng() * 0.35);
+    if (r < 0.48) put(TREES[Math.floor(rng() * TREES.length)], x, z, rng() * 6.28, 1.05 + rng() * 0.5);
+    else if (r < 0.64) put(r < 0.56 ? 'fp_tree2' : 'fp_tree6', x, z, rng() * 6.28, 0.85 + rng() * 0.35);
+    else if (r < 0.9) put(['rk_Tree3', 'rk_Tree4', 'rk_tree_1_a'][Math.floor(rng() * 3)], x, z, rng() * 6.28, 0.85 + rng() * 0.35);
+    else put('rk_bush_1', x, z, rng() * 6.28, 0.8 + rng() * 0.4);
   };
   const off = () => (rng() - 0.5) * CELL * 0.5;
   for (const g of greens) {
@@ -360,7 +362,8 @@ export function layoutGrid(analysis) {
       if (r < 0.32) {                       // placette
         paved.push(g.cz * cols + g.cx);
         put('fp_bench2', edgeX - tx * CELL * 0.12, edgeZ - tz * CELL * 0.12, along + (dz > 0 || dx > 0 ? Math.PI : 0));
-        put('fp_streetLight', edgeX + tx * CELL * 0.3, edgeZ + tz * CELL * 0.3, along);
+        const lamp = rng();
+        put(lamp < 0.5 ? 'fp_streetLight' : lamp < 0.8 ? 'rk_lamp_1' : 'rk_lamp_2', edgeX + tx * CELL * 0.3, edgeZ + tz * CELL * 0.3, along + (lamp >= 0.5 ? Math.atan2(-dx, -dz) - along : 0));
         if (rng() < 0.6) put('fp_garbageBin', edgeX + tx * CELL * 0.14, edgeZ + tz * CELL * 0.14, rng() * 6.28);
         tree(g.x - dx * CELL * 0.2 + off() * 0.4, g.z - dz * CELL * 0.2 + off() * 0.4);
       } else if (r < 0.52) {                // jardin
@@ -374,7 +377,10 @@ export function layoutGrid(analysis) {
           const t = (k - (n - 1) / 2) * CELL * 0.34;
           put(car, g.x + tx * t, g.z + tz * t, along + Math.PI / 2 + (rng() < 0.5 ? Math.PI : 0), car === 'fp_redCar' ? 1 : 2.2);
         }
-        if (rng() < 0.5) put('fp_trafficCone', edgeX + tx * CELL * 0.4, edgeZ + tz * CELL * 0.4, rng() * 6.28);
+        const extra = rng();
+        if (extra < 0.3) put('fp_trafficCone', edgeX + tx * CELL * 0.4, edgeZ + tz * CELL * 0.4, rng() * 6.28);
+        else if (extra < 0.55) put('rk_hazzard_cone_1', edgeX + tx * CELL * 0.4, edgeZ + tz * CELL * 0.4, rng() * 6.28);
+        else if (extra < 0.7) put('rk_traffic_barell_1', g.x - dx * CELL * 0.35 + tx * CELL * 0.38, g.z - dz * CELL * 0.35 + tz * CELL * 0.38, rng() * 6.28);
       } else if (r < 0.9) {                 // arbres d'alignement
         tree(edgeX - dx * CELL * 0.1 + tx * CELL * 0.22, edgeZ - dz * CELL * 0.1 + tz * CELL * 0.22);
         if (rng() < 0.55) tree(edgeX - dx * CELL * 0.1 - tx * CELL * 0.22, edgeZ - dz * CELL * 0.1 - tz * CELL * 0.22);
