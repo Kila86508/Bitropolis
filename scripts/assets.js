@@ -93,9 +93,13 @@ const FX_RX = /__FX_(Smoke|Beacon|Fountain)(?:_\d+)?$/;
 
 const linToSrgb = (v) => { v = Math.max(0, Math.min(1, v)); return Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)); };
 // Lumière de nuit : 2 = toujours allumé (lampadaires, signaux), 1 = fenêtre (allumée au hasard), 0 = rien
-function litOf(mat) {
+// Lentilles des feux tricolores : 3–5 (têtes « X ») ou 6–8 (têtes « Y ») pour rouge, vert, orange (« Off »).
+function litOf(mat, nodeName = '') {
   const name = (mat && mat.name) || '';
-  if (/NightLight|Signal|Flash|Lamp_?Light|Neon/i.test(name)) return 2;
+  const lens = /^Signal_(Red|Green|Off)$/.exec(name), head = /Signal_([XY])_\d+$/.exec(nodeName);
+  if (lens && head) return (head[1] === 'X' ? 3 : 6) + { Red: 0, Green: 1, Off: 2 }[lens[1]];
+  if (/Housing/i.test(name)) return 0;
+  if (/NightLight|Signal_|Flash|Lamp_?Light|Neon/i.test(name)) return 2;
   if (/window|glass|vitre/i.test(name)) return 1;
   const e = mat && mat.emissiveFactor;
   if (e && e[0] + e[1] + e[2] > 0.3) return 2;
@@ -165,7 +169,7 @@ export function readGLB(file) {
         uv: pr.attributes.TEXCOORD_0 != null ? accessor(pr.attributes.TEXCOORD_0) : null,
         image: imageOf(pbr.baseColorTexture && pbr.baseColorTexture.index),
         factor: pbr.baseColorFactor || [1, 1, 1, 1],
-        lit: litOf(mat), material: mat ? mat.name : ''
+        lit: litOf(mat, name), material: mat ? mat.name : ''
       });
     }
     for (const c of n.children || []) walk(c, W, part);

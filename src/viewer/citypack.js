@@ -7,23 +7,51 @@ import { packGeometry, packModel } from './assets.js';
 export const CITY_Y = 0.05;          // la ville affleure juste au-dessus de la pelouse de la campagne
 const GROUND_Y = CITY_Y - 0.012 * CELL; // dalles de sol, légèrement sous les routes et les bâtiments
 
-// Matériau des modèles du pack : couleurs par sommet + fenêtres et lampadaires qui s'allument la nuit.
-export function makePackMaterial(uGlow) {
+// Matériau des modèles du pack : couleurs par sommet, et la nuit :
+//  - fenêtres (aLit = 1) allumées étage par étage, qui s'allument et s'éteignent chacune à son rythme ;
+//  - lampadaires et signaux lumineux (aLit = 2) toujours allumés ;
+//  - lentilles des feux tricolores (aLit 3–5 : têtes « X », 6–8 : têtes « Y » ; rouge, vert, orange),
+//    commandées par l'attribut d'instance aSig = (état X, état Y) : 0 rouge, 1 orange, 2 vert.
+export function makePackMaterial(uGlow, uTime) {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.78, metalness: 0.02 });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uGlow = uGlow;
-    sh.vertexShader = 'attribute float aLit;\nvarying float vLit;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.uniforms.uTime = uTime;
+    sh.vertexShader = 'attribute float aLit;\nattribute vec2 aSig;\nuniform float uTime;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\n' +
+      sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
-        float bxRnd = fract(sin(float(gl_InstanceID) * 12.9898 + 78.233) * 43758.5453);
+        float bxId = float(gl_InstanceID);
       #else
-        float bxRnd = 0.5;
+        float bxId = 0.0;
       #endif
-      vLit = aLit > 1.5 ? 1.6 : (aLit > 0.5 ? 0.38 * step(0.3, bxRnd) : 0.0);`);
-    sh.fragmentShader = 'uniform float uGlow;\nvarying float vLit;\n' + sh.fragmentShader.replace(
-      '#include <emissivemap_fragment>',
-      '#include <emissivemap_fragment>\ntotalEmissiveRadiance += mix(vec3(1.0, 0.68, 0.32), vColor.rgb, 0.15) * uGlow * vLit;');
+      float bxRnd = fract(sin(bxId * 12.9898 + 78.233) * 43758.5453);
+      vLit = 0.0; vLamp = 0.0; vOn = 0.0; vLampCol = vec3(0.0);
+      if (aLit > 2.5) {
+        float axisY = aLit > 5.5 ? 1.0 : 0.0;
+        float lamp = aLit - (axisY > 0.5 ? 6.0 : 3.0);             // 0 rouge, 1 vert, 2 orange
+        float st = axisY > 0.5 ? aSig.y : aSig.x;                  // 0 rouge, 1 orange, 2 vert
+        float want = lamp < 0.5 ? 0.0 : (lamp < 1.5 ? 2.0 : 1.0);
+        vLamp = 1.0;
+        vOn = abs(st - want) < 0.5 ? 1.0 : 0.0;
+        vLampCol = lamp < 0.5 ? vec3(1.0, 0.08, 0.04) : (lamp < 1.5 ? vec3(0.1, 1.0, 0.3) : vec3(1.0, 0.62, 0.05));
+      } else if (aLit > 1.5) {
+        vLit = 1.6;
+      } else if (aLit > 0.5) {
+        // un étage = une bande de hauteur ; chaque étage change d'état à son propre rythme
+        float floorId = floor(position.y * 9.0);
+        float period = 9.0 + 26.0 * fract(bxRnd * 7.31 + floorId * 0.173);
+        float cycle = floor(uTime / period + bxRnd * 31.0 + floorId * 0.37);
+        float h = fract(sin(floorId * 91.7 + bxId * 12.9898 + cycle * 37.719) * 43758.5453);
+        vLit = h > 0.42 ? 0.4 : 0.0;
+      }`);
+    sh.fragmentShader = 'uniform float uGlow;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\n' + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (vLamp > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb * 0.22, vLampCol * 0.55, vOn);`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance += mix(vec3(1.0, 0.68, 0.32), vColor.rgb, 0.15) * uGlow * vLit;
+        if (vLamp > 0.5) totalEmissiveRadiance += vLampCol * vOn * (0.7 + 1.6 * uGlow);`);
   };
-  mat.customProgramCacheKey = () => 'bitropolis-pack';
+  mat.customProgramCacheKey = () => 'bitropolis-pack-2';
   return mat;
 }
 
@@ -92,7 +120,7 @@ export function buildPackCity(city, analysis, material, rng) {
     I.add(model, wx(x), GROUND_Y, wz(z), 0);
   }
   // --- routes
-  for (const t of city.roadTiles) I.add(t.model, t.x, CITY_Y, t.z, (t.rot * Math.PI) / 2);
+  const roadRefs = city.roadTiles.map((t) => I.add(t.model, t.x, CITY_Y, t.z, (t.rot * Math.PI) / 2));
 
   // --- bâtiments
   const buildings = new Array(analysis.files.length);
@@ -145,7 +173,13 @@ export function buildPackCity(city, analysis, material, rng) {
 
   I.build(group, meshes);
   for (const pt of parts) pt.mesh = meshes.get(pt.ref.model);
-  return { group, buildings, monuments, meshes, parts: parts.filter((pt) => pt.mesh), fx };
+  for (const r of roadRefs) r.mesh = meshes.get(r.model);
+  // état des feux par tuile (aSig), piloté par la simulation de trafic
+  for (const [model, mesh] of meshes) {
+    if (!/^Road_(T|Cross)_N[5-8]$/.test(model)) continue;
+    mesh.geometry.setAttribute('aSig', new THREE.InstancedBufferAttribute(new Float32Array(mesh.count * 2), 2).setUsage(THREE.DynamicDrawUsage));
+  }
+  return { group, buildings, monuments, meshes, parts: parts.filter((pt) => pt.mesh), fx, roadRefs };
 }
 
 // Véhicules du pack (InstancedMesh par modèle) ; renvoie les meshes indexés par nom.

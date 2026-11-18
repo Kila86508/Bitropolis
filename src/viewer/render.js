@@ -8,6 +8,7 @@ import { layoutGrid, CELL } from '../core/grid.js';
 import { VEHICLES } from '../core/catalog.js';
 import { packReady } from './assets.js';
 import { buildPackCity, buildPackVehicles, makePackMaterial, CITY_Y } from './citypack.js';
+import { TrafficSim } from './traffic.js';
 
 const BASE_Y = 0.32; // hauteur des parcelles (trottoir + dalle)
 
@@ -131,6 +132,7 @@ export class CityRenderer {
     this.controls = new CityControls(this.camera, canvas);
     this.clock = new THREE.Clock();
     this.glow = { value: 0 };
+    this.timeU = { value: 0 }; // horloge des lumières (fenêtres qui s'allument / s'éteignent)
     this.night = false;
     this.nightMix = 0;
     this.state = { traffic: true, deps: false, labels: true };
@@ -188,6 +190,7 @@ export class CityRenderer {
     this.growLabels = null;
     this.fx = null;
     this.animParts = [];
+    this.traffic = null;
   }
 
   load(analysis, themeId = 'lowpoly') {
@@ -221,12 +224,13 @@ export class CityRenderer {
     this.buildings = new Array(files.length);
     if (usePack) {
       // --- Ville du pack : sol, routes N1→N8, bâtiments à stades, arbres, monuments
-      this._packMat = makePackMaterial(this.glow);
+      this._packMat = makePackMaterial(this.glow, this.timeU);
       const pc = buildPackCity(city, analysis, this._packMat, makeRng('pack:' + analysis.name));
       root.add(pc.group);
       this.buildings = pc.buildings;
       this.roundabouts = pc.monuments;
       this.packMeshes = pc.meshes;
+      this.roadRefs = pc.roadRefs;
       this._buildFx(pc.parts, pc.fx, root);
     } else {
       // --- Sol : bitume de la ville (les espaces libres deviennent des routes)
@@ -539,6 +543,18 @@ export class CityRenderer {
   }
 
   _buildCars(city, root) {
+    this.traffic = null;
+    if (this.usePack) {
+      // ville du pack : vraie circulation (voies, distances, feux, priorité à droite)
+      this.traffic = new TrafficSim({
+        city, cell: CELL, cityY: CITY_Y, rng: makeRng('traffic:' + this.analysis.name), models: VEHICLES, roadRefs: this.roadRefs,
+        buildMeshes: (names, counts) => buildPackVehicles(names, counts, this._packMat)
+      });
+      this.cars = this.traffic.cars;
+      this.carMeshes = [...this.traffic.meshes.values()];
+      for (const m of this.carMeshes) root.add(m);
+      return;
+    }
     const geoBody = new THREE.BoxGeometry(0.85, 0.45, 1.6).translate(0, 0.38, 0).toNonIndexed();
     const geoCab = new THREE.BoxGeometry(0.72, 0.36, 0.85).translate(0, 0.78, -0.08).toNonIndexed();
     const merge = (geos, colors) => {
@@ -609,6 +625,11 @@ export class CityRenderer {
   }
 
   _updateCars(dt) {
+    if (this.traffic) {
+      this.traffic.setVisible(this.state.traffic);
+      if (this.state.traffic) this.traffic.update(dt);
+      return;
+    }
     if (!this.cars || !this.carMeshes) return;
     for (const m of this.carMeshes) m.visible = this.state.traffic;
     if (!this.state.traffic) return;
@@ -821,6 +842,7 @@ export class CityRenderer {
         this.nightMix += Math.sign(target - this.nightMix) * Math.min(Math.abs(target - this.nightMix), dt * 1.4);
         this._applyNight(true);
       }
+      this.timeU.value += dt;
       this._updateCars(dt);
       this._updateGrowth(dt);
       this._updateFx(dt);
