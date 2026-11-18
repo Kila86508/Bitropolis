@@ -91,6 +91,9 @@ const m4apply = (M, x, y, z) => [M[0] * x + M[4] * y + M[8] * z + M[12], M[1] * 
 const PART_RX = /__(Rotor|Chimney_\d+|Cube)$/;
 const FX_RX = /__FX_(Smoke|Beacon|Fountain)(?:_\d+)?$/;
 
+// Matériaux prévus pour être recolorés (une palette différente par bâtiment)
+const PALETTE_ROLES = { Palette_Wall_1: 1, Palette_Wall_2: 2, Palette_Wall_3: 3, Palette_Roof: 4, Palette_Trim: 5, Palette_Accent: 6 };
+
 const linToSrgb = (v) => { v = Math.max(0, Math.min(1, v)); return Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)); };
 // Lumière de nuit : 2 = toujours allumé (lampadaires, signaux), 1 = fenêtre (allumée au hasard), 0 = rien
 // Lentilles des feux tricolores : 3–5 (têtes « X ») ou 6–8 (têtes « Y ») pour rouge, vert, orange (« Off »).
@@ -225,10 +228,11 @@ export function readOBJ(file, scale = 1) {
 // --- Un pack = plusieurs modèles partageant une palette, sérialisés dans un seul binaire gzip.
 class PackWriter {
   constructor() { this.palette = []; this.paletteIndex = new Map(); this.chunks = []; this.size = 0; this.models = {}; }
-  color(r, g, b, lit) {
-    const key = `${r},${g},${b},${lit}`;
+  // role : matériau recolorable du pack (0 aucun, 1–3 murs, 4 toit, 5 boiseries, 6 accent)
+  color(r, g, b, lit, role = 0) {
+    const key = `${r},${g},${b},${lit},${role}`;
     let k = this.paletteIndex.get(key);
-    if (k === undefined) { k = this.palette.length; this.palette.push([r, g, b, lit]); this.paletteIndex.set(key, k); }
+    if (k === undefined) { k = this.palette.length; this.palette.push(role ? [r, g, b, lit, role] : [r, g, b, lit]); this.paletteIndex.set(key, k); }
     return k;
   }
   push(typed) {
@@ -285,7 +289,7 @@ class PackWriter {
           const toLin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
           r = toLin(img.data[o]); g = toLin(img.data[o + 1]); b = toLin(img.data[o + 2]);
         }
-        C[v] = this.color(linToSrgb(r * p.factor[0]), linToSrgb(g * p.factor[1]), linToSrgb(b * p.factor[2]), p.lit);
+        C[v] = this.color(linToSrgb(r * p.factor[0]), linToSrgb(g * p.factor[1]), linToSrgb(b * p.factor[2]), p.lit, PALETTE_ROLES[p.material] || 0);
       }
       for (const q of p.idx) I[i++] = base + q;
     }
@@ -302,6 +306,7 @@ class PackWriter {
     for (const [name, info] of Object.entries(this.models)) {
       const copy = { ...info };
       if (copy.parts) copy.parts = copy.parts.map((pt) => ({ ...pt, k: obfName(pt.k, salt) }));
+      if (copy.alts) copy.alts = copy.alts.map((a) => obfName(a, salt));
       models[obfName(name, salt)] = copy;
     }
     return { v: 2, salt, palette: this.palette, models, data: Buffer.from(obfXor(gz, salt)).toString('base64') };
@@ -334,7 +339,12 @@ export function packCity({ dir = CITY_PACK_DIR } = {}) {
   }
   const missing = [];
   for (const name of packModelNames()) {
-    if (index.has(name)) w.add(name, index.get(name)); else missing.push(name);
+    if (!index.has(name)) { missing.push(name); continue; }
+    w.add(name, index.get(name));
+    // variantes facultatives : Commercial_N2_B.glb, Commercial_N2_C.glb… (même rôle, autre apparence)
+    const alts = [...index.keys()].filter((k) => k.length === name.length + 2 && k.startsWith(name + '_') && /^[A-Z]$/.test(k.slice(-1))).sort();
+    for (const alt of alts) w.add(alt, index.get(alt));
+    if (alts.length && w.models[name]) w.models[name].alts = alts.filter((a) => w.models[a]);
   }
   if (missing.length) console.warn('⚠️  Modèles absents du pack :', missing.join(', '));
   // accessoires urbains (.obj + .mtl)

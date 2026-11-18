@@ -51,9 +51,9 @@ export function packGeometry(pack, name, warp = null) {
   const m = P && P.models[asKey(P, name)];
   if (!m) return null;
   if (!warp && P.cache.has(name)) return P.cache.get(name);
-  if (!P.colors) P.colors = P.palette.map(([r, g, b, l]) => { const c = new THREE.Color(`rgb(${r},${g},${b})`); return [c.r, c.g, c.b, l]; });
+  if (!P.colors) P.colors = P.palette.map(([r, g, b, l, role]) => { const c = new THREE.Color(`rgb(${r},${g},${b})`); return [c.r, c.g, c.b, l, role || 0]; });
   const p = new Int16Array(P.buf, m.p, m.n * 3), c = new Uint16Array(P.buf, m.c, m.n), idx = new Uint16Array(P.buf, m.i, m.m);
-  const pos = new Float32Array(m.n * 3), col = new Float32Array(m.n * 3), lit = new Float32Array(m.n);
+  const pos = new Float32Array(m.n * 3), col = new Float32Array(m.n * 3), lit = new Float32Array(m.n), role = new Float32Array(m.n);
   for (let v = 0; v < m.n; v++) {
     let x = p[v * 3] * m.s, y = p[v * 3 + 1] * m.s, z = p[v * 3 + 2] * m.s;
     if (warp) [x, y, z] = warp(x, y, z);
@@ -61,11 +61,13 @@ export function packGeometry(pack, name, warp = null) {
     const k = P.colors[c[v]];
     col[v * 3] = k[0]; col[v * 3 + 1] = k[1]; col[v * 3 + 2] = k[2];
     lit[v] = k[3];
+    role[v] = k[4];
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.setAttribute('aLit', new THREE.BufferAttribute(lit, 1));
+  g.setAttribute('aRole', new THREE.BufferAttribute(role, 1));
   g.setIndex(new THREE.BufferAttribute(new Uint16Array(idx), 1));
   g.computeVertexNormals();
   g.computeBoundingSphere();

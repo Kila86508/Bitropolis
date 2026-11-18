@@ -3,6 +3,24 @@
 import { CELL } from '../core/grid.js';
 import { TREES, GROUNDS } from '../core/catalog.js';
 import { packGeometry, packModel } from './assets.js';
+import { hashString } from '../core/rules.js';
+
+// Harmonies de couleurs pour les matériaux recolorables du pack (murs 1–3, toit, boiseries, accent).
+// Chaque bâtiment en tire une d'après son chemin (graine stable) ; la graine 0 garde les couleurs d'origine.
+const PACK_SCHEMES = [
+  ['#e8d8b8', '#c9b18a', '#a8c4d8', '#b5523b', '#5b4636', '#2e86ab'],
+  ['#f2e3c6', '#d9a066', '#e8d8b8', '#6d7178', '#3b3b44', '#d1495b'],
+  ['#cfe1e8', '#9fbfd0', '#ffffff', '#2f4858', '#f5f5f0', '#f6ae2d'],
+  ['#f4c7a1', '#e09f7d', '#fff1e0', '#7a4b3a', '#4a3b33', '#3e8e7e'],
+  ['#dfe7d0', '#b8cfa0', '#f7f7ef', '#5a7d4f', '#3d4a35', '#e76f51'],
+  ['#e9e4f0', '#c5b8d9', '#ffffff', '#4b3f72', '#2e2a3d', '#f4a261'],
+  ['#f7f1e3', '#e0c9a6', '#c8d6e5', '#c0392b', '#7f5539', '#2a9d8f'],
+  ['#d6d2c4', '#a89f91', '#efeae0', '#3a3f47', '#1f2328', '#e9c46a'],
+  ['#fbe7c6', '#f4b393', '#fffaf0', '#8c5e58', '#5c4033', '#457b9d'],
+  ['#c9d6df', '#8fa9b8', '#f0f4f7', '#52616b', '#1e2022', '#ff7f50'],
+  ['#f1dfd1', '#d4a5a5', '#fff5ee', '#6b4f4f', '#3c2f2f', '#6a994e']
+];
+const PACK_SCHEME_COUNT = PACK_SCHEMES.length + 1;
 
 export const CITY_Y = 0.05;          // la ville affleure juste au-dessus de la pelouse de la campagne
 const GROUND_Y = CITY_Y - 0.012 * CELL; // dalles de sol, légèrement sous les routes et les bâtiments
@@ -13,11 +31,14 @@ const GROUND_Y = CITY_Y - 0.012 * CELL; // dalles de sol, légèrement sous les 
 //  - lentilles des feux tricolores (aLit 3–5 : têtes « X », 6–8 : têtes « Y » ; rouge, vert, orange),
 //    commandées par l'attribut d'instance aSig = (état X, état Y) : 0 rouge, 1 orange, 2 vert.
 export function makePackMaterial(uGlow, uTime) {
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.78, metalness: 0.02 });
+  // double face : permet d'inverser certains bâtiments en miroir (l'éclairage « flat » reste juste)
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.78, metalness: 0.02, side: THREE.DoubleSide });
+  const schemes = PACK_SCHEMES.flat().map((hex) => new THREE.Color(hex));
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uGlow = uGlow;
     sh.uniforms.uTime = uTime;
-    sh.vertexShader = 'attribute float aLit;\nattribute vec2 aSig;\nuniform float uTime;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\n' +
+    sh.uniforms.uScheme = { value: schemes };
+    sh.vertexShader = `attribute float aLit;\nattribute float aRole;\nattribute float aSeed;\nattribute vec2 aSig;\nuniform float uTime;\nuniform vec3 uScheme[${schemes.length}];\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\n` +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
         float bxId = float(gl_InstanceID);
@@ -26,6 +47,13 @@ export function makePackMaterial(uGlow, uTime) {
       #endif
       float bxRnd = fract(sin(bxId * 12.9898 + 78.233) * 43758.5453);
       vLit = 0.0; vLamp = 0.0; vOn = 0.0; vLampCol = vec3(0.0);
+      vRecol = vec3(0.0); vRecolOn = 0.0;
+      #ifdef USE_INSTANCING
+      if (aRole > 0.5) {
+        float si = floor(fract(aSeed) * ${PACK_SCHEME_COUNT}.0);
+        if (si > 0.5) { vRecol = uScheme[int(si - 1.0) * 6 + int(aRole + 0.5) - 1]; vRecolOn = 1.0; }
+      }
+      #endif
       if (aLit > 2.5) {
         float axisY = aLit > 5.5 ? 1.0 : 0.0;
         float lamp = aLit - (axisY > 0.5 ? 6.0 : 3.0);             // 0 rouge, 1 vert, 2 orange
@@ -44,29 +72,31 @@ export function makePackMaterial(uGlow, uTime) {
         float h = fract(sin(floorId * 91.7 + bxId * 12.9898 + cycle * 37.719) * 43758.5453);
         vLit = h > 0.42 ? 0.4 : 0.0;
       }`);
-    sh.fragmentShader = 'uniform float uGlow;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\n' + sh.fragmentShader
+    sh.fragmentShader = 'uniform float uGlow;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
+        diffuseColor.rgb = mix(diffuseColor.rgb, vRecol, vRecolOn);
         if (vLamp > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb * 0.22, vLampCol * 0.55, vOn);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         totalEmissiveRadiance += mix(vec3(1.0, 0.68, 0.32), vColor.rgb, 0.15) * uGlow * vLit;
         if (vLamp > 0.5) totalEmissiveRadiance += vLampCol * vOn * (0.7 + 1.6 * uGlow);`);
   };
-  mat.customProgramCacheKey = () => 'bitropolis-pack-2';
+  mat.customProgramCacheKey = () => 'bitropolis-pack-3';
   return mat;
 }
 
 // Regroupe des instances par modèle puis crée les InstancedMesh.
 class PackInstancer {
   constructor(material) { this.material = material; this.lists = new Map(); this.dummy = new THREE.Object3D(); }
-  add(model, x, y, z, ry, s = CELL, sy = s) {
+  // mirror : inverse le modèle selon x ; seed ∈ [0,1) : choix de la palette de couleurs
+  add(model, x, y, z, ry, s = CELL, sy = s, mirror = false, seed = Math.random()) {
     const d = this.dummy;
-    d.position.set(x, y, z); d.rotation.set(0, ry, 0); d.scale.set(s, sy, s); d.updateMatrix();
-    return this.addMatrix(model, d.matrix);
+    d.position.set(x, y, z); d.rotation.set(0, ry, 0); d.scale.set(mirror ? -s : s, sy, s); d.updateMatrix();
+    return this.addMatrix(model, d.matrix, seed);
   }
-  addMatrix(model, matrix) {
+  addMatrix(model, matrix, seed = Math.random()) {
     if (!this.lists.has(model)) this.lists.set(model, []);
     const list = this.lists.get(model);
-    list.push(matrix.clone());
+    list.push({ m: matrix.clone(), seed });
     return { model, index: list.length - 1 };
   }
   build(group, meshes, { shadow = true } = {}) {
@@ -74,7 +104,9 @@ class PackInstancer {
       const geo = packGeometry('city', model);
       if (!geo) continue;
       const mesh = new THREE.InstancedMesh(geo, this.material, list.length);
-      list.forEach((m, i) => mesh.setMatrixAt(i, m));
+      const seeds = new Float32Array(list.length);
+      list.forEach((it, i) => { mesh.setMatrixAt(i, it.m); seeds[i] = it.seed; });
+      geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
       mesh.castShadow = shadow; mesh.receiveShadow = true;
@@ -87,12 +119,14 @@ class PackInstancer {
 }
 
 // Boîte englobante d'un modèle posé (rotation 0 ou π autour de Y)
-function packBox(model, x, z, ry, s) {
+function packBox(model, x, z, ry, s, mirror = false) {
   const m = packModel('city', model);
   const box = new THREE.Box3();
   if (!m) { box.setFromCenterAndSize(new THREE.Vector3(x, s / 2, z), new THREE.Vector3(s, s, s)); return box; }
   const flip = Math.abs(Math.cos(ry)) > 0.5 && Math.cos(ry) < 0;
-  const x0 = m.min[0] * s, x1 = m.max[0] * s, z0 = m.min[2] * s, z1 = m.max[2] * s;
+  let x0 = m.min[0] * s, x1 = m.max[0] * s;
+  if (mirror) [x0, x1] = [-x1, -x0];
+  const z0 = m.min[2] * s, z1 = m.max[2] * s;
   box.min.set(x + (flip ? -x1 : x0), CITY_Y, z + (flip ? -z1 : z0));
   box.max.set(x + (flip ? -x0 : x1), CITY_Y + m.max[1] * s, z + (flip ? -z0 : z1));
   return box;
@@ -131,7 +165,7 @@ export function buildPackCity(city, analysis, material, rng) {
     if (!info) return;
     for (const pt of info.parts || []) {
       const pivot = new THREE.Matrix4().fromArray(pt.m);
-      const ref = I.addMatrix(pt.k, owner.matrix.clone().multiply(pivot));
+      const ref = I.addMatrix(pt.k, owner.matrix.clone().multiply(pivot), owner.seed);
       parts.push({ owner, ref, pivot, kind: pt.n.replace(/_\d+$/, ''), phase: rng() * 6.28 });
     }
     for (const e of info.fx || []) fx.push({ owner, type: e.t, p: new THREE.Vector3(...e.p), phase: rng(), big: /^Nuclear/.test(model) });
@@ -148,13 +182,22 @@ export function buildPackCity(city, analysis, material, rng) {
       for (let k = 0; k < n; k++) I.add(TREES[Math.floor(rng() * TREES.length)], lot.x + r(), CITY_Y, lot.z + r(), rng() * 6.28, CELL * (1.1 + rng() * 0.5));
       I.add(rng() < 0.5 ? 'Rock' : 'Rock_B', lot.x + r(), CITY_Y, lot.z + r(), rng() * 6.28, CELL * 1.2);
       box = new THREE.Box3(new THREE.Vector3(lot.x - CELL * 0.45, CITY_Y, lot.z - CELL * 0.45), new THREE.Vector3(lot.x + CELL * 0.45, CITY_Y + CELL * 0.9, lot.z + CELL * 0.45));
-    } else {
-      ref = I.add(lot.model, lot.x, CITY_Y, lot.z, ry);
-      box = packBox(lot.model, lot.x, lot.z, ry, CELL);
     }
-    const matrix = new THREE.Matrix4().compose(new THREE.Vector3(lot.x, CITY_Y, lot.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry), new THREE.Vector3(CELL, CELL, CELL));
-    buildings[f.id] = { id: f.id, box, lot, ref, ry, matrix };
-    if (ref) attach(buildings[f.id], lot.model);
+    // apparence propre au fichier (stable d'une génération à l'autre) : palette de couleurs et miroir
+    const h = hashString(f.path);
+    const seed = ((h >>> 8) % 100000) / 100000;
+    const mirror = !lot.model.startsWith('@') && !/^Townhall/.test(lot.model) && (h & 1) === 1;
+    let shown = lot.model;
+    if (!lot.model.startsWith('@')) {
+      // variantes du même modèle dans le pack (Commercial_N2_B…) : l'une d'elles, d'après le fichier
+      const alts = (packModel('city', lot.model) || {}).alts;
+      if (alts && alts.length) { const pick = ((h >>> 3) % 997) % (alts.length + 1); if (pick) shown = alts[pick - 1]; }
+      ref = I.add(shown, lot.x, CITY_Y, lot.z, ry, CELL, CELL, mirror, seed);
+      box = packBox(shown, lot.x, lot.z, ry, CELL, mirror);
+    }
+    const matrix = new THREE.Matrix4().compose(new THREE.Vector3(lot.x, CITY_Y, lot.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry), new THREE.Vector3(mirror ? -CELL : CELL, CELL, CELL));
+    buildings[f.id] = { id: f.id, box, lot, ref, ry, matrix, mirror, seed };
+    if (ref) attach(buildings[f.id], shown);
   }
 
   // --- mobilier des cases libres (arbres, bancs, lampadaires, jardins, voitures garées) et monuments

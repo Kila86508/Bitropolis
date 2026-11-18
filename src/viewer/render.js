@@ -418,7 +418,7 @@ export class CityRenderer {
       const mesh = this.packMeshes.get(b.ref.model);
       if (!mesh) return;
       const delay = 0.9 + Math.min(2.5, n * 0.06);
-      const anim = { b, mesh, index: b.ref.index, x: b.lot.x, z: b.lot.z, ry: b.ry, t: -delay, from: ev.type === 'new' ? 0.02 : 0.35 };
+      const anim = { b, mesh, index: b.ref.index, x: b.lot.x, z: b.lot.z, ry: b.ry, mirror: !!b.mirror, t: -delay, from: ev.type === 'new' ? 0.02 : 0.35 };
       this.growAnims.push(anim);
       this._growApply(anim, 0);
       if (labels++ < 30) {
@@ -512,7 +512,7 @@ export class CityRenderer {
     const d = this._growDummy || (this._growDummy = new THREE.Object3D());
     const back = 1.70158, e = k <= 0 ? 0 : k >= 1 ? 1 : 1 + (back + 1) * Math.pow(k - 1, 3) + back * Math.pow(k - 1, 2);
     const sy = a.from + (1 - a.from) * e;
-    d.position.set(a.x, CITY_Y, a.z); d.rotation.set(0, a.ry, 0); d.scale.set(CELL, CELL * Math.max(0.01, sy), CELL); d.updateMatrix();
+    d.position.set(a.x, CITY_Y, a.z); d.rotation.set(0, a.ry, 0); d.scale.set(a.mirror ? -CELL : CELL, CELL * Math.max(0.01, sy), CELL); d.updateMatrix();
     a.mesh.setMatrixAt(a.index, d.matrix);
     a.mesh.instanceMatrix.needsUpdate = true;
     if (a.b && a.b.matrix) a.b.matrix.copy(d.matrix); // les pièces mobiles et la fumée suivent la croissance
