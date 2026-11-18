@@ -1,0 +1,7 @@
+node_modules/
+bitropolis-city/
+*.city.json
+.DS_Store
+# Modèles 3D d'origine (privés) : seule leur version chiffrée, dans dist/bitropolis.html, est publiée
+FULL_VERSION_250_MODELS/
+Asset/

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitropolis</title>
+<meta name="description" content="Bitropolis transforme ton code en ville 3D. 100 % local.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='26' width='14' height='32' fill='%23f6d6a8'/%3E%3Crect x='24' y='8' width='16' height='50' fill='%2389c2f0'/%3E%3Crect x='44' y='20' width='14' height='38' fill='%23f4a7a0'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0f1526; --panel: rgba(17, 24, 42, 0.82); --panel-solid: #141c31; --line: rgba(255,255,255,0.09);
+  --text: #eef2fb; --muted: #9aa8c4; --accent: #ffb84d; --accent2: #2ec4ff; --out: #ff9f1c; --in: #2ec4ff;
+  --radius: 16px; --shadow: 0 10px 40px rgba(0,0,0,0.35);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#city { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+button { font: inherit; color: inherit; }
+.glass { background: var(--panel); backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+/* Marque + stats */
+#brand { position: fixed; top: 16px; left: 16px; padding: 12px 16px; max-width: min(520px, calc(100vw - 32px)); }
+#brand .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: 0.14em; font-size: 15px; }
+#brand .logo i { display: inline-flex; gap: 2px; align-items: flex-end; height: 18px; }
+#brand .logo i b { width: 5px; border-radius: 1px; }
+#brand .logo i b:nth-child(1) { height: 10px; background: #f6d6a8; }
+#brand .logo i b:nth-child(2) { height: 18px; background: #89c2f0; }
+#brand .logo i b:nth-child(3) { height: 13px; background: #f4a7a0; }
+#project-name { font-size: 20px; font-weight: 700; margin: 4px 0 8px; word-break: break-all; }
+#stats { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; color: var(--muted); background: rgba(255,255,255,0.06); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.chip b { color: var(--text); }
+body:not(.has-city) #brand .city-only, body:not(.has-city) #toolbar, body:not(.has-city) .search, body:not(.has-city) #legend { display: none; }
+
+/* Barre d'outils */
+#toolbar { position: fixed; top: 16px; right: 16px; display: flex; gap: 6px; padding: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 32px); }
+#toolbar button, #toolbar select { background: rgba(255,255,255,0.05); border: 1px solid transparent; border-radius: 10px; padding: 7px 10px; cursor: pointer; white-space: nowrap; }
+#toolbar button:hover, #toolbar select:hover { background: rgba(255,255,255,0.12); }
+#toolbar button.on { background: rgba(255, 184, 77, 0.18); border-color: rgba(255,184,77,0.55); }
+#toolbar select { color: var(--text); appearance: none; padding-right: 22px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 52%, calc(100% - 7px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
+#toolbar select option { background: var(--panel-solid); }
+
+/* Recherche */
+.search { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); width: min(380px, calc(100vw - 32px)); }
+#search { width: 100%; padding: 11px 14px 11px 38px; border-radius: 12px; border: 1px solid var(--line); color: var(--text);
+  background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%239aa8c4' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='M11 11l4 4'/%3E%3C/svg%3E") no-repeat 13px center;
+  backdrop-filter: blur(14px); outline: none; font: inherit; box-shadow: var(--shadow); }
+#search:focus { border-color: rgba(46,196,255,0.6); }
+#search-results { margin-top: 6px; padding: 6px; max-height: 50vh; overflow: auto; }
+#search-results button { display: grid; grid-template-columns: 24px 1fr; width: 100%; text-align: left; padding: 7px 8px; border: 0; background: none; border-radius: 9px; cursor: pointer; }
+#search-results button:hover { background: rgba(255,255,255,0.08); }
+#search-results small { grid-column: 2; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#search-results .empty { padding: 10px; color: var(--muted); }
+
+/* Panneau d'infos */
+#panel { position: fixed; right: 16px; top: 76px; bottom: 16px; width: min(360px, calc(100vw - 32px)); padding: 18px; overflow: auto;
+  transform: translateX(calc(100% + 40px)); transition: transform 0.35s cubic-bezier(.2,.8,.2,1); }
+#panel.open { transform: none; }
+#panel-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 9px; border: 0; background: rgba(255,255,255,0.07); cursor: pointer; }
+#panel .kind { font-weight: 700; color: var(--accent); display: flex; flex-direction: column; }
+#panel .kind small { color: var(--muted); font-weight: 400; }
+#panel h2 { margin: 8px 0 2px; font-size: 22px; word-break: break-all; }
+#panel .path { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; word-break: break-all; }
+#panel .tier { margin: 10px 0 14px; color: var(--muted); }
+#panel .tier span { color: #ffd23f; letter-spacing: 2px; }
+#panel .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+#panel .metrics div { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 8px; min-width: 0; }
+#panel .metrics small { display: block; color: var(--muted); font-size: 11px; }
+#panel .metrics b { font-size: 14px; overflow-wrap: anywhere; }
+#panel h3 { font-size: 13px; margin: 18px 0 6px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+#panel h3 em { font-style: normal; color: var(--text); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot.out { background: var(--out); } .dot.in { background: var(--in); }
+.deps { display: flex; flex-direction: column; gap: 3px; }
+.dep { display: grid; grid-template-columns: 22px 1fr; text-align: left; border: 0; padding: 6px 8px; border-radius: 9px; background: rgba(255,255,255,0.04); cursor: pointer; }
+.dep:hover { background: rgba(255,255,255,0.1); }
+.dep small { grid-column: 2; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.none, .rb { color: var(--muted); margin: 4px 0; }
+
+/* Légende */
+#legend { position: fixed; left: 16px; bottom: 16px; width: min(330px, calc(100vw - 32px)); padding: 10px 12px; max-height: calc(100vh - 220px); overflow: auto; }
+#legend-toggle { width: 100%; display: flex; justify-content: space-between; border: 0; background: none; cursor: pointer; padding: 2px; font-weight: 700; }
+#legend.collapsed #legend-items { display: none; }
+#legend.collapsed #legend-toggle span:last-child { transform: rotate(180deg); }
+#legend-items { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+#legend-items li { display: grid; grid-template-columns: 26px 1fr auto; gap: 6px; align-items: start; }
+#legend-items li.sep { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 2px; }
+#legend-items .ic { font-size: 17px; }
+#legend-items small { display: block; color: var(--muted); font-size: 11.5px; }
+#legend-items em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Infobulle */
+#tooltip { position: fixed; pointer-events: none; padding: 9px 12px; display: flex; flex-direction: column; gap: 1px; max-width: 320px; z-index: 5; }
+#tooltip i { color: #ffd23f; font-style: normal; letter-spacing: 1px; }
+#tooltip span, #tooltip small { color: var(--muted); }
+#tooltip small { font-size: 11.5px; word-break: break-all; }
+
+/* Accueil */
+#welcome { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; z-index: 8;
+  background: radial-gradient(1200px 600px at 50% 110%, #2b4f7a 0%, transparent 60%), radial-gradient(800px 400px at 20% 0%, #3a2f5c 0%, transparent 60%), var(--bg); }
+#welcome .card { text-align: center; max-width: 620px; }
+#welcome .skyline { display: flex; align-items: flex-end; justify-content: center; gap: 6px; height: 120px; margin-bottom: 26px; }
+#welcome .skyline b { width: 26px; border-radius: 4px 4px 0 0; animation: rise 1.2s cubic-bezier(.2,.9,.2,1) both; }
+@keyframes rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+#welcome .skyline b { transform-origin: bottom; }
+#welcome h1 { font-size: clamp(38px, 8vw, 64px); margin: 0; letter-spacing: 0.12em; font-weight: 900;
+  background: linear-gradient(90deg, #ffd29a, #8fd0ff 50%, #f7a8c4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#welcome .lead { font-size: 18px; color: var(--muted); margin: 10px 0 28px; }
+#welcome .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.btn { border: 0; border-radius: 12px; padding: 13px 20px; font-weight: 700; cursor: pointer; font-size: 15px; }
+.btn.primary { background: linear-gradient(135deg, #ffb84d, #ff7a59); color: #1d1206; }
+.btn.ghost { background: rgba(255,255,255,0.08); border: 1px solid var(--line); }
+.btn:hover { filter: brightness(1.08); }
+#welcome .note { margin-top: 26px; color: var(--muted); font-size: 13px; }
+#welcome .note b { color: #9be7a8; }
+#welcome code { background: rgba(255,255,255,0.08); padding: 2px 7px; border-radius: 6px; font-size: 12.5px; }
+
+/* Glisser-déposer, chargement, toast */
+#drop { position: fixed; inset: 12px; border: 3px dashed rgba(255,184,77,0.8); border-radius: 22px; display: none; place-items: center; z-index: 9;
+  background: rgba(15,21,38,0.75); font-size: 22px; font-weight: 700; pointer-events: none; }
+body.dragging #drop { display: grid; }
+#loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 10; background: rgba(15,21,38,0.6); }
+#loading[hidden], #toast[hidden], #tooltip[hidden], #welcome[hidden], #search-results[hidden] { display: none; }
+#loading div { padding: 18px 24px; display: flex; gap: 12px; align-items: center; }
+#loading i { width: 18px; height: 18px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.2); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); padding: 12px 18px; z-index: 11; max-width: calc(100vw - 32px); }
+#help { position: fixed; right: 16px; bottom: 16px; color: rgba(255,255,255,0.55); font-size: 12px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); text-align: right; pointer-events: none; }
+body:not(.has-city) #help { display: none; }
+#panel.open ~ #help { display: none; }
+
+@media (min-width: 901px) and (max-width: 1480px) {
+  .search { left: auto; right: 16px; transform: none; top: 74px; width: 300px; }
+  #panel { top: 128px; }
+}
+@media (max-width: 900px) {
+  #stats { display: none; }
+  .search { top: auto; bottom: 16px; }
+  #legend { display: none; }
+  #help { display: none; }
+  #toolbar { top: auto; bottom: 70px; left: 16px; right: 16px; justify-content: center; }
+  #toolbar .lbl { display: none; }
+  #panel { top: auto; height: 55vh; bottom: 0; right: 0; width: 100%; border-radius: 18px 18px 0 0; transform: translateY(105%); }
+  #brand { padding: 10px 12px; } #project-name { font-size: 16px; }
+}
+.growth { margin: 10px 0 14px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--line); }
+.growth .g-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.growth .g-head span { color: #ffb84d; font-weight: 700; font-size: 13px; }
+.growth .g-bar { height: 7px; border-radius: 6px; background: rgba(255,255,255,0.1); margin: 8px 0 6px; overflow: hidden; }
+.growth .g-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #ffb84d, #ff7a59); }
+.growth small { display: block; opacity: 0.75; font-size: 12px; line-height: 1.4; }
+.growth .g-ev { display: block; margin-top: 6px; font-style: normal; color: #06d6a0; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<canvas id="city"></canvas>
+
+<header id="brand" class="glass">
+  <div class="logo"><i><b></b><b></b><b></b></i>BITROPOLIS</div>
+  <div class="city-only">
+    <div id="project-name"></div>
+    <div id="stats"></div>
+  </div>
+</header>
+
+<div class="search">
+  <input id="search" type="search" placeholder="Chercher un fichier…  ( / )" autocomplete="off" spellcheck="false">
+  <div id="search-results" class="glass" hidden></div>
+</div>
+
+<nav id="toolbar" class="glass">
+  <button id="btn-night" title="Jour / nuit">🌙<span class="lbl"> Nuit</span></button>
+  <button id="btn-deps" title="Afficher toutes les dépendances">🔗<span class="lbl"> Liens</span></button>
+  <button id="btn-traffic" class="on" title="Circulation">🚗<span class="lbl"> Trafic</span></button>
+  <button id="btn-labels" class="on" title="Noms des quartiers">🏷️<span class="lbl"> Quartiers</span></button>
+  <button id="btn-home" title="Recentrer la vue">🎯</button>
+  <button id="btn-land" title="Nouvelle campagne : relief, lacs, forêts (Maj+clic : carte d'origine du projet)">🎲<span class="lbl"> Carte</span></button>
+  <button id="btn-shot" title="Capture d'écran (PNG)">📸</button>
+  <select id="theme" title="Thème"></select>
+  <button id="btn-open" title="Ouvrir un autre dossier">📁<span class="lbl"> Ouvrir</span></button>
+</nav>
+
+<aside id="legend" class="glass">
+  <button id="legend-toggle"><span>🗺️ Légende</span><span>▾</span></button>
+  <ul id="legend-items"></ul>
+</aside>
+
+<aside id="panel" class="glass">
+  <button id="panel-close" title="Fermer">✕</button>
+  <div id="panel-body"></div>
+</aside>
+
+<div id="help">Glisser : tourner · Clic droit : déplacer · Molette : zoom · Double-clic : s'approcher</div>
+<div id="tooltip" class="glass" hidden></div>
+
+<section id="welcome">
+  <div class="card">
+    <div class="skyline">
+      <b style="height:40%;background:#f6d6a8;animation-delay:.05s"></b><b style="height:70%;background:#cfe6f7;animation-delay:.12s"></b>
+      <b style="height:100%;background:#89c2f0;animation-delay:.2s"></b><b style="height:55%;background:#f4a7a0;animation-delay:.28s"></b>
+      <b style="height:82%;background:#d6ecc9;animation-delay:.36s"></b><b style="height:35%;background:#e6d4f2;animation-delay:.44s"></b>
+      <b style="height:62%;background:#fbe7a1;animation-delay:.52s"></b>
+    </div>
+    <h1>BITROPOLIS</h1>
+    <p class="lead">Ton code devient une ville. Chaque dossier est un quartier, chaque fichier un bâtiment.</p>
+    <div class="actions">
+      <button id="welcome-open" class="btn primary">📁 Ouvrir un dossier de code</button>
+      <button id="welcome-demo" class="btn ghost">🏙️ Visiter la ville démo</button>
+    </div>
+    <p class="note">Tu peux aussi <b>glisser-déposer</b> un dossier ici. <b>100 % local</b> : rien ne quitte ton ordinateur, aucune donnée n'est envoyée.<br>
+      En ligne de commande : <code>npx bitropolis ./mon-projet</code></p>
+  </div>
+</section>
+
+<div id="drop">Lâche ton dossier pour bâtir la ville 🏗️</div>
+<div id="loading" hidden><div class="glass"><i></i><span>Chargement…</span></div></div>
+<div id="toast" class="glass" hidden></div>
+<input id="folder-input" type="file" webkitdirectory directory multiple hidden>
+
+<script id="bitropolis-data" type="application/json">/*__DATA__*/</script>
+<script id="bitropolis-demo" type="application/json">/*__DEMO__*/</script>
+<script type="module">
+/*__APP__*/
+</script>
+</body>
+</html>

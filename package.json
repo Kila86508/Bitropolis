@@ -1,0 +1,38 @@
+{
+  "name": "bitropolis",
+  "version": "0.1.0",
+  "description": "Transforme ton code en ville 3D low poly. 100 % local.",
+  "main": "src/core/analyze.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "start": "node bin/bitropolis.js .",
+    "test": "node --test"
+  },
+  "keywords": [
+    "code",
+    "visualization",
+    "city",
+    "3d",
+    "low-poly",
+    "codecity",
+    "threejs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "type": "module",
+  "bin": {
+    "bitropolis": "bin/bitropolis.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "scripts",
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
