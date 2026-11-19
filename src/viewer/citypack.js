@@ -206,16 +206,20 @@ export function buildPackCity(city, analysis, material, rng) {
     let model;
     if (type === 0) model = paved.has(k) ? GROUNDS[(x + z) & 1] : GROUNDS[2 + ((x + z) & 1)];
     else if (type === 2) model = GROUNDS[(tops.get(k) ?? 0) & 1 ? 1 : 0];
+    else if (type === 3) continue; // eau : la tuile de rivière a son propre lit
     else model = GROUNDS[0];
     I.add(model, wx(x), GROUND_Y, wz(z), 0);
   }
   // --- routes
   // tuiles du kit de voirie quand le pack les contient (sinon anciennes routes du pack)
   const roadRefs = city.roadTiles.map((t) => {
-    const k = kitRoad(t.model, t.rot, t.crossing);
+    const k = kitRoad(t.model, t.rot, t);
     const use = k && packModel('city', k.model) ? k : t;
     return I.add(use.model, t.x, CITY_Y, t.z, (use.rot * Math.PI) / 2);
   });
+
+  // eau de la rivière (le pont porte sa propre eau)
+  for (const w of city.water || []) if (packModel('city', w.model)) I.add(w.model, w.x, CITY_Y, w.z, (w.rot * Math.PI) / 2);
 
   // --- bâtiments
   const buildings = new Array(analysis.files.length);

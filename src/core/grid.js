@@ -136,6 +136,36 @@ const GD_ROADS = (() => {
   return t;
 })();
 
+// Rivière (kit de voirie) : trois rangées insérées en travers de la ville — berge, eau, berge.
+// La rangée est choisie entre deux îlots (aucun bâtiment coupé), de préférence le long d'une route (quai)
+// et là où le plus de rues la traversent ; ces rues montent par une rampe, passent sur un pont et redescendent.
+function gdInsertRiver(grid, cols, rows, out) {
+  let best = -1, bestScore = -Infinity;
+  for (let zr = 4; zr <= rows - 4; zr++) {
+    if (out.items.some((it) => it.z < zr && it.z + it.d > zr)) continue;
+    let cross = 0, quay = 0;
+    for (let x = 0; x < cols; x++) {
+      const a = grid[(zr - 1) * cols + x] === 1, b = grid[zr * cols + x] === 1;
+      if (a && b) cross++;
+      quay += (a ? 1 : 0) + (b ? 1 : 0);
+    }
+    if (cross < 2) continue;
+    const score = (cross / cols) * 20 + (quay / cols) * 4 - (Math.abs(zr - rows / 2) / rows) * 24;
+    if (score > bestScore) { bestScore = score; best = zr; }
+  }
+  if (best < 0) return null;
+  const zr = best, cross = [];
+  for (let x = 0; x < cols; x++) if (grid[(zr - 1) * cols + x] === 1 && grid[zr * cols + x] === 1) cross.push(x);
+  const g = new Int8Array(cols * (rows + 3));
+  g.set(grid.subarray(0, zr * cols), 0);
+  g.set(grid.subarray(zr * cols), (zr + 3) * cols);
+  for (let x = 0; x < cols; x++) { g[zr * cols + x] = 0; g[(zr + 1) * cols + x] = 3; g[(zr + 2) * cols + x] = 0; }
+  for (const x of cross) for (let j = 0; j < 3; j++) g[(zr + j) * cols + x] = 1;
+  for (const it of out.items) if (it.z >= zr) it.z += 3;
+  for (const b of out.leaves) { if (b.z >= zr) b.z += 3; else if (b.z + b.d > zr) b.d += 3; }
+  return { grid: g, rows: rows + 3, zr, cross };
+}
+
 // Gros projets : un sous-dossier de moins de `min` fichiers rejoint le quartier de son parent.
 // Sinon des milliers de quartiers d'un ou deux bâtiments, chacun entouré de routes, laissent la ville à moitié vide.
 function gdFoldSmallDirs(root, min) {
@@ -151,7 +181,8 @@ function gdFoldSmallDirs(root, min) {
   fold(root);
 }
 
-export function layoutGrid(analysis) {
+// opts.kit : le kit de voirie est disponible (rivière, ponts, passages supérieurs, ronds-points)
+export function layoutGrid(analysis, opts = {}) {
   const files = analysis.files;
   const rng = makeRng('grid:' + analysis.name + ':' + files.length);
   const growth = files.map((f) => growthOf(f));
@@ -182,17 +213,41 @@ export function layoutGrid(analysis) {
   const top = build(root);
 
   // 2) placement : périphérique tout autour
-  const cols = top.w + 2, rows = top.d + 2;
-  const grid = new Int8Array(cols * rows); // 0 verdure, 1 route, 2 bâtiment
+  const cols = top.w + 2;
+  let rows = top.d + 2;
+  let grid = new Int8Array(cols * rows); // 0 verdure, 1 route, 2 bâtiment, 3 eau
   const out = { items: [], leaves: [], road: (x, z) => { grid[z * cols + x] = 1; } };
   gdEmit(top, 1, 1, out);
   for (let x = 0; x < cols; x++) { grid[x] = 1; grid[(rows - 1) * cols + x] = 1; }
   for (let z = 0; z < rows; z++) { grid[z * cols] = 1; grid[z * cols + cols - 1] = 1; }
   for (const it of out.items) for (let j = 0; j < it.d; j++) for (let i = 0; i < it.w; i++) grid[(it.z + j) * cols + it.x + i] = 2;
 
+  // 2b) rivière et ponts. special : case → { kind: 'ramp' | 'bridge' | 'over' | 'round', up, axis }
+  const special = new Map();
+  let river = null;
+  if (opts.kit && rows >= 16) {
+    river = gdInsertRiver(grid, cols, rows, out);
+    if (river) {
+      grid = river.grid; rows = river.rows;
+      for (const x of river.cross) {
+        special.set(river.zr * cols + x, { kind: 'ramp', up: 3, axis: 1 });         // monte vers le pont (au sud)
+        special.set((river.zr + 1) * cols + x, { kind: 'bridge', axis: 1 });
+        special.set((river.zr + 2) * cols + x, { kind: 'ramp', up: 2, axis: 1 });   // monte vers le pont (au nord)
+      }
+    }
+  }
+
   const ox = -(cols * CELL) / 2, oz = -(rows * CELL) / 2;
   const wx = (x) => ox + (x + 0.5) * CELL, wz = (z) => oz + (z + 0.5) * CELL;
   const isRoad = (x, z) => x >= 0 && z >= 0 && x < cols && z < rows && grid[z * cols + x] === 1;
+  // rampes et ponts ne se raccordent que dans leur axe (jamais de carrefour sur une rampe)
+  const lockAxis = (x, z) => { const sp = special.get(z * cols + x); return sp && (sp.kind === 'ramp' || sp.kind === 'bridge') ? sp.axis : -1; };
+  const link = (x, z, dx, dz) => {
+    if (!isRoad(x, z) || !isRoad(x + dx, z + dz)) return false;
+    if (dx !== 0 && (lockAxis(x, z) === 1 || lockAxis(x + dx, z) === 1)) return false;
+    if (dz !== 0 && (lockAxis(x, z) === 0 || lockAxis(x, z + dz) === 0)) return false;
+    return true;
+  };
 
   // 3) trafic : chaque dépendance entre deux îlots est acheminée par le plus court chemin routier
   const traffic = new Float64Array(cols * rows), pairOf = new Array(cols * rows);
@@ -225,7 +280,7 @@ export function layoutGrid(analysis) {
       const c = queue[qh++], x = c % cols, z = (c - x) / cols;
       for (const [dx, dz] of GD_DIRS) {
         const nx = x + dx, nz = z + dz;
-        if (!isRoad(nx, nz)) continue;
+        if (!link(x, z, dx, dz)) continue;
         const k = nz * cols + nx;
         if (prev[k] !== -2) continue;
         prev[k] = c; queue[qt++] = k;
@@ -254,6 +309,7 @@ export function layoutGrid(analysis) {
   const tierOfTraffic = (t) => (t <= 0 || maxT <= 0 ? 1 : 1 + Math.round((ROAD_TIERS - 1) * Math.log1p(t) / Math.log1p(maxT)));
   const ring = (x, z) => x === 0 || z === 0 || x === cols - 1 || z === rows - 1;
   const cellTier = new Int8Array(cols * rows);
+  const axisTier = [new Int8Array(cols * rows), new Int8Array(cols * rows)]; // niveau du tronçon horizontal / vertical
   const segments = [];
   const runs = (horizontal) => {
     const A = horizontal ? rows : cols, B = horizontal ? cols : rows;
@@ -263,7 +319,7 @@ export function layoutGrid(analysis) {
         const at = (bb) => (horizontal ? isRoad(bb, a) : isRoad(a, bb));
         if (!at(b)) { b++; continue; }
         let e = b;
-        while (e + 1 < B && at(e + 1)) e++;
+        while (e + 1 < B && at(e + 1) && (horizontal ? link(e, a, 1, 0) : link(a, e, 0, 1))) e++;
         if (e > b) {
           let t = 0, onRing = true, best = null;
           for (let k = b; k <= e; k++) {
@@ -273,7 +329,7 @@ export function layoutGrid(analysis) {
             if (pairOf[c] && (!best || pairOf[c].c > best.c)) best = pairOf[c];
           }
           const tier = Math.max(tierOfTraffic(t), onRing ? 4 : 2);
-          for (let k = b; k <= e; k++) { const c = horizontal ? a * cols + k : k * cols + a; cellTier[c] = Math.max(cellTier[c], tier); }
+          for (let k = b; k <= e; k++) { const c = horizontal ? a * cols + k : k * cols + a; cellTier[c] = Math.max(cellTier[c], tier); axisTier[horizontal ? 0 : 1][c] = tier; }
           const x1 = horizontal ? b : a, z1 = horizontal ? a : b, x2 = horizontal ? e : a, z2 = horizontal ? a : e;
           segments.push({ x1: wx(x1), z1: wz(z1), x2: wx(x2), z2: wz(z2), w: CELL * (0.32 + tier * 0.075), traffic: Math.round(t), tier, ring: onRing, labels: best ? best.label : null, cells: [x1, z1, x2, z2] });
         }
@@ -283,18 +339,68 @@ export function layoutGrid(analysis) {
   };
   runs(true); runs(false);
 
+  // 4b) kit de voirie : passages supérieurs (une grande avenue enjambe un carrefour : rampe, pont, rampe)
+  //     et ronds-points sur les carrefours de niveau « route ».
+  const maskAt = (x, z) => GD_DIRS.reduce((m, [dx, dz], i) => (link(x, z, dx, dz) ? m | (1 << i) : m), 0);
+  const ringCell = (x, z) => x === 0 || z === 0 || x === cols - 1 || z === rows - 1;
+  if (opts.kit) {
+    const cand = [];
+    for (let z = 2; z < rows - 2; z++) for (let x = 2; x < cols - 2; x++) {
+      const k = z * cols + x;
+      if (!isRoad(x, z) || special.has(k) || maskAt(x, z) !== 15) continue;
+      const axis = axisTier[1][k] > axisTier[0][k] ? 1 : 0, tierE = axisTier[axis][k];
+      if (tierE < 5) continue;
+      const [dx, dz] = axis === 0 ? [1, 0] : [0, 1], along = axis === 0 ? 3 : 12; // masque d'une ligne droite dans l'axe
+      const ok = [-1, 1].every((sg) => {
+        const nx = x + sg * dx, nz = z + sg * dz;
+        return isRoad(nx, nz) && !special.has(nz * cols + nx) && !ringCell(nx, nz) && maskAt(nx, nz) === along;
+      });
+      if (ok) cand.push({ x, z, k, axis, t: traffic[k] });
+    }
+    cand.sort((a, b) => b.t - a.t || a.k - b.k);
+    let roadCount = 0;
+    for (let i = 0; i < grid.length; i++) if (grid[i] === 1) roadCount++;
+    const nOver = Math.max(1, Math.min(4, Math.round(roadCount / 700))), overs = [];
+    for (const c of cand) {
+      if (overs.length >= nOver) break;
+      if (overs.some((o) => Math.abs(o.x - c.x) + Math.abs(o.z - c.z) < 7)) continue;
+      overs.push(c);
+      const [dx, dz] = c.axis === 0 ? [1, 0] : [0, 1];
+      special.set(c.k, { kind: 'over', axis: c.axis });
+      // rampes : le côté haut regarde le passage supérieur (0 = -x, 1 = +x, 2 = -z, 3 = +z)
+      special.set((c.z - dz) * cols + (c.x - dx), { kind: 'ramp', up: c.axis === 0 ? 1 : 3, axis: c.axis });
+      special.set((c.z + dz) * cols + (c.x + dx), { kind: 'ramp', up: c.axis === 0 ? 0 : 2, axis: c.axis });
+    }
+    // ronds-points : carrefours en croix de niveau N4 à N6 (les avenues gardent leurs feux), un sur deux environ
+    for (let z = 1; z < rows - 1; z++) for (let x = 1; x < cols - 1; x++) {
+      const k = z * cols + x;
+      if (!isRoad(x, z) || special.has(k) || maskAt(x, z) !== 15) continue;
+      const tmax = Math.max(axisTier[0][k], axisTier[1][k]);
+      if (tmax < 4 || tmax > 6) continue;
+      if (GD_DIRS.some(([dx, dz]) => (special.get((z + dz) * cols + x + dx) || {}).kind === 'round')) continue;
+      if (((x * 73856093) ^ (z * 19349663)) % 100 < 55) special.set(k, { kind: 'round' });
+    }
+  }
+
   // 5) tuiles de route
   const roadTiles = [];
   for (let z = 0; z < rows; z++) for (let x = 0; x < cols; x++) {
     if (!isRoad(x, z)) continue;
-    let mask = 0;
-    GD_DIRS.forEach(([dx, dz], i) => { if (isRoad(x + dx, z + dz)) mask |= 1 << i; });
+    const mask = maskAt(x, z);
     const t = GD_ROADS[mask] || GD_ROADS[3];
+    const sp = special.get(z * cols + x);
     // ligne droite qui débouche sur un carrefour : passage piéton (kit de voirie)
-    const degree = (cx, cz) => GD_DIRS.reduce((n, [dx, dz]) => n + (isRoad(cx + dx, cz + dz) ? 1 : 0), 0);
-    const crossing = t.shape === 'Road_Straight' && GD_DIRS.some(([dx, dz], i) => (mask & (1 << i)) && degree(x + dx, z + dz) >= 3);
-    roadTiles.push({ x: wx(x), z: wz(z), cx: x, cz: z, model: `${t.shape}_N${Math.max(1, cellTier[z * cols + x] || 2)}`, rot: t.rot, crossing });
+    const degree = (cx, cz) => { const sq = special.get(cz * cols + cx); return sq && (sq.kind === 'over') ? 2 : GD_DIRS.reduce((n, [dx, dz]) => n + (link(cx, cz, dx, dz) ? 1 : 0), 0); };
+    const crossing = !sp && t.shape === 'Road_Straight' && GD_DIRS.some(([dx, dz], i) => (mask & (1 << i)) && degree(x + dx, z + dz) >= 3);
+    let tier = Math.max(1, cellTier[z * cols + x] || 2);
+    if (sp && sp.kind === 'over') tier = Math.max(1, axisTier[sp.axis][z * cols + x] || tier);
+    const tile = { x: wx(x), z: wz(z), cx: x, cz: z, model: `${t.shape}_N${tier}`, rot: t.rot, crossing, mask };
+    if (sp) Object.assign(tile, { kind: sp.kind }, sp.up !== undefined ? { up: sp.up } : {}, sp.axis !== undefined ? { axis: sp.axis } : {});
+    roadTiles.push(tile);
   }
+  // eau de la rivière (hors ponts)
+  const water = [];
+  if (river) for (let x = 0; x < cols; x++) if (grid[(river.zr + 1) * cols + x] === 3) water.push({ x: wx(x), z: wz(river.zr + 1), cx: x, cz: river.zr + 1, model: 'Riviere_Droite', rot: 0 });
 
   // 6) bâtiments (parcelles)
   const lots = new Array(files.length);
@@ -415,7 +521,8 @@ export function layoutGrid(analysis) {
   return {
     grid: true, cell: CELL, cols, rows, origin: [ox, oz],
     size: Math.max(cols, rows) * CELL, ring: 0,
-    roads: segments, roadTiles, blocks, districts, lots, roundabouts, trees, greens, decor, paved,
+    roads: segments, roadTiles, water, river: river ? { z: river.zr + 1, cross: river.cross.length } : null,
+    blocks, districts, lots, roundabouts, trees, greens, decor, paved,
     districtNames: [...topIndex.keys()], maxTraffic: maxT,
     cellAt: (x, z) => grid[z * cols + x]
   };

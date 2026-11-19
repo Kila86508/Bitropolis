@@ -108,18 +108,33 @@ const KIT_ROT = Object.fromEntries(Object.entries(KIT_SHAPES).map(([shape, kit])
   const want = kitMask(PACK_EXITS[shape], 0);
   return [shape, [0, 1, 2, 3].find((k) => kitMask(KIT_EXITS[kit], k) === want)];
 }));
-// « Road_T_N6 », rotation 1 → { model: 'Route_T', rot: 1 } ; crossing : passage piéton sur une ligne droite
-export function kitRoad(model, rot, crossing = false) {
+// Hauteurs (fraction de case) : tablier des ponts, rampes et passages supérieurs ; petit pont en bois des chemins
+export const ROAD_KIT_DECK = 0.26, ROAD_KIT_DECK_WOOD = 0.05;
+// rampe du kit : côté haut au nord (-z) à rotation nulle → rotation pour que le côté haut regarde `up`
+const RAMP_ROT = { 2: 0, 0: 1, 3: 2, 1: 3 };
+// Tuile du kit pour une tuile de route : « Road_T_N6 », rotation 1 → { model: 'Route_T', rot: 1 }.
+// t.crossing : passage piéton ; t.kind : 'bridge' (pont sur la rivière), 'ramp' (côté haut vers t.up),
+// 'over' (passage supérieur, tablier dans l'axe t.axis : 0 = x, 1 = z), 'round' (rond-point)
+export function kitRoad(model, rot, t = {}) {
+  if (typeof t === 'boolean') t = { crossing: t };
   const m = /^(Road_[A-Za-z]+)_N(\d+)$/.exec(model);
   if (!m || !(m[1] in KIT_SHAPES)) return null;
   const tier = ROAD_KIT_TIERS[Math.min(8, Math.max(1, +m[2]))];
+  const straightRot = (rot + KIT_ROT.Road_Straight) % 4; // pièces droites du kit : axe nord–sud à rotation nulle
+  if (t.kind === 'round') return { model: 'Route_RondPoint', rot: 0 };
+  if (t.kind === 'bridge') return { model: tier === 'Chemin' ? 'Chemin_PontBois' : `${tier}_PontDroit`, rot: straightRot };
+  if (t.kind === 'ramp') return tier === 'Chemin' ? { model: 'Chemin_Droite', rot: straightRot } : { model: `${tier}_Rampe`, rot: RAMP_ROT[t.up] };
+  if (t.kind === 'over') return { model: `${tier === 'Chemin' ? 'PetiteRoute' : tier}_PontCroise`, rot: t.axis === 0 ? 1 : 0 };
   let shape = KIT_SHAPES[m[1]];
-  if (shape === 'Droite' && crossing && tier !== 'Chemin') shape = 'Passage';
+  if (shape === 'Droite' && t.crossing && tier !== 'Chemin') shape = 'Passage';
   return { model: `${tier}_${shape}`, rot: (rot + KIT_ROT[m[1]]) % 4 };
 }
 export function roadKitModelNames() {
-  const out = [];
-  for (const tier of new Set(ROAD_KIT_TIERS)) for (const shape of [...Object.values(KIT_SHAPES), 'Passage']) if (!(tier === 'Chemin' && shape === 'Passage')) out.push(`${tier}_${shape}`);
+  const out = ['Route_RondPoint', 'Chemin_PontBois', 'Riviere_Droite', 'Riviere_Courbe'];
+  for (const tier of new Set(ROAD_KIT_TIERS)) {
+    for (const shape of [...Object.values(KIT_SHAPES), 'Passage']) if (!(tier === 'Chemin' && shape === 'Passage')) out.push(`${tier}_${shape}`);
+    if (tier !== 'Chemin') for (const shape of ['PontDroit', 'Rampe', 'PontCroise']) out.push(`${tier}_${shape}`);
+  }
   return out;
 }
 
