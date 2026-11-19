@@ -8,27 +8,37 @@ import { fileURLToPath } from 'node:url';
 import { scanDirectory } from '../src/node/scan.js';
 import { analyzeProject, KINDS } from '../src/core/analyze.js';
 import { growthSnapshot } from '../src/core/catalog.js';
+import { t, setLang, fmtNum, kindLabel } from '../src/viewer/i18n.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 
-const HELP = `
-  🏙️  Bitropolis ${VERSION} — ton code devient une ville
+// Langue : --lang xx, sinon BITROPOLIS_LANG, sinon celle du système (voir i18n.js)
+{
+  const i = process.argv.findIndex((x) => x === '--lang' || x === '-l');
+  const code = (i >= 0 && process.argv[i + 1]) || process.env.BITROPOLIS_LANG;
+  if (code) setLang(String(code).slice(0, 2).toLowerCase());
+}
 
-  Utilisation
-    bitropolis [dossier] [options]
+const pad = (s, w) => (s + ' ').padEnd(w);
+const HELP = () => `
+  🏙️  Bitropolis ${VERSION} — ${t('cli.tagline')}
 
-  Options
-    -o, --out <fichier>   Fichier HTML à créer (défaut : ./bitropolis-city/index.html)
-    -n, --name <nom>      Nom de la ville (défaut : nom du dossier)
-        --json            Écrit aussi l'analyse brute (city.json) à côté du HTML
-        --no-open         Ne pas ouvrir le navigateur
-    -v, --version         Version
-    -h, --help            Aide
+  ${t('cli.usage')}
+    bitropolis [${t('cli.arg.dir')}] [options]
 
-  Exemples
-    bitropolis                     # la ville du dossier courant
-    bitropolis ~/code/mon-jeu -o mon-jeu.html
+  ${t('cli.options')}
+    -o, --out ${pad(`<${t('cli.arg.file')}>`, 12)}${t('cli.o.out')}
+    -n, --name ${pad(`<${t('cli.arg.name')}>`, 11)}${t('cli.o.name')}
+        --json            ${t('cli.o.json')}
+        --no-open         ${t('cli.o.noopen')}
+    -l, --lang <xx>       ${t('cli.o.lang')}
+    -v, --version         ${t('cli.o.version')}
+    -h, --help            ${t('cli.o.help')}
+
+  ${t('cli.examples')}
+    npx bitropolis                     # ${t('cli.ex.cwd')}
+    npx bitropolis ~/code/my-game -o my-game.html
 `;
 
 function parseArgs(argv) {
@@ -41,7 +51,8 @@ function parseArgs(argv) {
     else if (a === '-n' || a === '--name') o.name = argv[++i];
     else if (a === '--json') o.json = true;
     else if (a === '--no-open') o.open = false;
-    else if (a.startsWith('-')) { console.error(`Option inconnue : ${a}`); process.exit(1); }
+    else if (a === '-l' || a === '--lang') i++;
+    else if (a.startsWith('-')) { console.error(t('cli.unknown', { a })); process.exit(1); }
     else o.dir = a;
   }
   return o;
@@ -54,28 +65,28 @@ function openInBrowser(file) {
     : ['xdg-open', [file]];
   try {
     const child = spawn(cmd[0], cmd[1], { stdio: 'ignore', detached: true });
-    child.on('error', () => console.log(`   Ouvre ce fichier dans ton navigateur : ${url}`));
+    child.on('error', () => console.log('   ' + t('cli.openit', { url })));
     child.unref();
-  } catch { console.log(`   Ouvre ce fichier dans ton navigateur : ${url}`); }
+  } catch { console.log('   ' + t('cli.openit', { url })); }
 }
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  if (opts.help) { console.log(HELP); return; }
+  if (opts.help) { console.log(HELP()); return; }
   if (opts.version) { console.log(VERSION); return; }
 
   const dir = path.resolve(opts.dir);
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
-    console.error(`❌ Dossier introuvable : ${dir}`);
+    console.error('❌ ' + t('cli.notfound', { dir }));
     process.exit(1);
   }
   const name = opts.name || path.basename(dir);
-  console.log(`\n🏗️  Bitropolis — construction de « ${name} »`);
+  console.log('\n🏗️  ' + t('cli.building', { name }));
 
   const t0 = Date.now();
-  const raw = scanDirectory(dir, { onProgress: (n) => process.stdout.isTTY && process.stdout.write(`\r   📂 ${n} fichiers lus…`) });
+  const raw = scanDirectory(dir, { onProgress: (n) => process.stdout.isTTY && process.stdout.write('\r   📂 ' + t('cli.reading', { n })) });
   if (process.stdout.isTTY) process.stdout.write('\r' + ' '.repeat(40) + '\r');
-  if (!raw.length) { console.error('❌ Aucun fichier exploitable dans ce dossier.'); process.exit(1); }
+  if (!raw.length) { console.error('❌ ' + t('cli.nofiles')); process.exit(1); }
   const analysis = analyzeProject(raw, { name });
   const s = analysis.stats;
 
@@ -105,12 +116,12 @@ async function main() {
   fs.writeFileSync(out, html);
   if (opts.json) fs.writeFileSync(out.replace(/\.html?$/i, '') + '.city.json', JSON.stringify(analysis, null, 2));
 
-  const top = Object.entries(s.kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${KINDS[k].icon} ${n} ${KINDS[k].label.toLowerCase()}`).join(' · ');
-  console.log(`   🏢 ${s.files} bâtiments · 📝 ${s.loc.toLocaleString('fr-FR')} lignes · 🔗 ${s.edges} liaisons`);
+  const top = Object.entries(s.kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${KINDS[k].icon} ${n} ${kindLabel(k).toLowerCase()}`).join(' · ');
+  console.log('   🏢 ' + t('cli.summary', { files: fmtNum(s.files), loc: fmtNum(s.loc), edges: fmtNum(s.edges) }));
   console.log(`   🗺️  ${top}`);
-  if (analysis.truncated) console.log(`   ⚠️  ${analysis.truncated} fichiers mineurs ignorés (projet géant)`);
-  console.log(`   ✅ Ville prête en ${((Date.now() - t0) / 1000).toFixed(1)} s → ${path.relative(process.cwd(), out) || out}`);
-  console.log(`   🔒 100 % local : aucun code source n'est copié, rien n'est envoyé.\n`);
+  if (analysis.truncated) console.log('   ⚠️  ' + t('cli.truncated', { n: fmtNum(analysis.truncated) }));
+  console.log('   ✅ ' + t('cli.ready', { s: ((Date.now() - t0) / 1000).toFixed(1), out: path.relative(process.cwd(), out) || out }));
+  console.log('   🔒 ' + t('cli.local') + '\n');
   if (opts.open) openInBrowser(out);
 }
 

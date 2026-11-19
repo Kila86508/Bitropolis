@@ -12,6 +12,7 @@ The bigger a file gets, the more its building levels up.
 [![Live demo](https://img.shields.io/badge/▶_live-demo-ff7a59?style=for-the-badge)](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)
 [![100% local](https://img.shields.io/badge/100_%25-local-2a9d8f?style=for-the-badge)](#-100-local-for-real)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A5_18-457b9d?style=for-the-badge)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/bitropolis?style=for-the-badge&color=cb3837)](https://www.npmjs.com/package/bitropolis)
 [![MIT license](https://img.shields.io/badge/code-MIT-6d7178?style=for-the-badge)](LICENSE)
 
 ![Bitropolis: a 3D city generated from a code project](docs/hero.jpg)
@@ -80,9 +81,15 @@ The bigger a file gets, the more its building levels up.
 
 ### Option 1: nothing to install
 
-Open the **[live demo](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, or [`dist/bitropolis.html`](dist/bitropolis.html) locally (double-click), then **drag and drop your folder** or click “Ouvrir un dossier” (open a folder). Everything happens in your browser: nothing is uploaded.
+Open the **[live demo](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, or [`dist/bitropolis.html`](dist/bitropolis.html) locally (double-click), then **drag and drop your folder** or click “📁 Open a code folder”. Everything happens in your browser: nothing is uploaded.
 
 ### Option 2: command line (Node.js ≥ 18)
+
+```bash
+npx bitropolis ~/code/my-project
+```
+
+Or from source:
 
 ```bash
 git clone https://github.com/Kila86508/Bitropolis.git
@@ -99,6 +106,7 @@ bitropolis [folder] [options]
   -n, --name <name>     City name
       --json            Also export the raw analysis (.city.json)
       --no-open         Do not open the browser
+  -l, --lang <xx>       Language: en, fr, de, it, es, zh, ru
 ```
 
 The generated file is **self-contained**: send it to a friend, it opens without a server or Internet access.
@@ -115,9 +123,9 @@ The generated file is **self-contained**: send it to a friend, it opens without 
 | Search a file | `/` |
 | Deselect | `Esc` |
 
-Toolbar: 🌙 day / night · 🔗 all dependencies · 🚗 traffic · 🏷️ districts · 🎯 recenter · 🎲 new countryside · 📸 screenshot · theme.
+Toolbar: 🌙 day / night · 🔗 all dependencies · 🚗 traffic · 🏷️ districts · 🎯 recenter · 🎲 new countryside · 📸 screenshot · theme · language.
 
-> The interface itself is in French for now.
+> 🌐 The interface and the CLI speak **English, French, German, Italian, Spanish, Chinese and Russian**: your browser (or system) language is picked automatically, and the language menu in the toolbar switches it.
 
 ## 🏙️ What about a really big project?
 

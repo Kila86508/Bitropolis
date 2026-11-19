@@ -1,15 +1,15 @@
 // Bitropolis — interface : panneaux, recherche, légende, ouverture de dossier locale.
-import { KINDS, TIER_NAMES, analyzeProject } from '../core/analyze.js';
+import { KINDS, analyzeProject } from '../core/analyze.js';
 import { shouldSkipDir, shouldSkipFile, shouldReadContent, makeIgnoreMatcher, MAX_FILES } from '../core/rules.js';
 import { UPCOMING_THEMES, availableThemes, defaultThemeId } from './themes/index.js';
 import { hasLandscapeAssets } from './landscape.js';
 import { assetsReady } from './assets.js';
-import { modelLabel, growthSnapshot, growthDiff } from '../core/catalog.js';
+import { growthSnapshot, growthDiff } from '../core/catalog.js';
+import { t, tp, fmtNum, fmtBytes, kindLabel, kindRole, famName, modelName, applyI18n, getLang, setLang, UI_LANGS } from './i18n.js';
 
 const $ = (sel) => document.querySelector(sel);
 function uiEsc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-function uiNum(n) { return Number(n || 0).toLocaleString('fr-FR'); }
-function uiBytes(n) { return n < 1024 ? n + ' o' : n < 1048576 ? (n / 1024).toFixed(1) + ' Ko' : (n / 1048576).toFixed(1) + ' Mo'; }
+const uiNum = fmtNum, uiBytes = fmtBytes;
 function uiStars(t) { return '★'.repeat(t) + '☆'.repeat(5 - t); }
 // Graine de campagne choisie avec 🎲, mémorisée par projet dans ce navigateur (jamais envoyée).
 function uiLandKey(name) { return 'bitropolis.land:' + name; }
@@ -18,7 +18,7 @@ function uiSaveLandSeed(name, seed) { try { if (seed) localStorage.setItem(uiLan
 // Dernier état connu de chaque bâtiment (pour animer ce qui a grandi depuis la dernière visite).
 function uiLoadSnap(name) { try { return JSON.parse(localStorage.getItem('bitropolis.snap:' + name) || 'null'); } catch { return null; } }
 function uiSaveSnap(name, snap) { try { localStorage.setItem('bitropolis.snap:' + name, JSON.stringify(snap)); } catch {} }
-function uiTierName(f) { return (f.kind === 'tower' ? TIER_NAMES.tower : TIER_NAMES.default)[f.tier - 1]; }
+function uiTierName(f) { return f.kind === 'tower' ? t('tier.tower')[f.tier - 1] : t('tier.level', { n: f.tier }); }
 
 // ---- Lecture locale d'un dossier dans le navigateur (aucun envoi réseau)
 async function uiReadFiles(entries, rootName, onProgress) {
@@ -94,15 +94,34 @@ export class CityUI {
     this.engine = engine;
     this.analysis = null;
     this.themeId = defaultThemeId();
+    applyI18n();
     this._bind();
     this._themes();
+    this._langs();
   }
 
   _themes() {
     const sel = $('#theme');
-    sel.innerHTML = availableThemes().map((t) => `<option value="${t.id}"${t.id === this.themeId ? ' selected' : ''}>${uiEsc(t.name)}</option>`).join('') +
-      UPCOMING_THEMES.map((t) => `<option disabled>${uiEsc(t.name)} — bientôt</option>`).join('');
+    const fill = () => {
+      sel.innerHTML = availableThemes().map((th) => `<option value="${th.id}"${th.id === this.themeId ? ' selected' : ''}>${uiEsc(t('theme.' + th.id))}</option>`).join('') +
+        UPCOMING_THEMES.map((th) => `<option disabled>${uiEsc(t('theme.soon', { name: t('theme.' + th.id) }))}</option>`).join('');
+    };
+    fill();
+    this._fillThemes = fill;
     sel.addEventListener('change', () => { this.themeId = sel.value; if (this.analysis) this.load(this.analysis); });
+  }
+
+  // Sélecteur de langue : traduit l'interface et reconstruit la ville (légende, étiquettes 3D)
+  _langs() {
+    const sel = $('#lang');
+    if (!sel) return;
+    sel.innerHTML = UI_LANGS.map((l) => `<option value="${l.code}"${l.code === getLang() ? ' selected' : ''}>${uiEsc(l.name)}</option>`).join('');
+    sel.addEventListener('change', () => {
+      setLang(sel.value);
+      applyI18n();
+      this._fillThemes();
+      if (this.analysis) { this._noEvolution = true; this.load(this.analysis); }
+    });
   }
 
   _bind() {
@@ -111,6 +130,7 @@ export class CityUI {
       btn.addEventListener('click', () => { const on = !btn.classList.contains('on'); btn.classList.toggle('on', on); fn(on); });
     };
     toggle($('#btn-night'), (on) => e.setNight(on));
+    e.onNightChange = (on) => $('#btn-night').classList.toggle('on', on); // le cycle automatique met le bouton à jour
     toggle($('#btn-deps'), (on) => e.setDeps(on));
     toggle($('#btn-traffic'), (on) => e.setTraffic(on));
     toggle($('#btn-labels'), (on) => e.setLabels(on));
@@ -123,7 +143,7 @@ export class CityUI {
       const seed = ev.shiftKey ? name : name + '#' + Math.random().toString(36).slice(2, 8);
       const plan = e.setLandSeed(seed);
       uiSaveLandSeed(name, ev.shiftKey ? null : seed);
-      if (plan) this.toast(ev.shiftKey ? "Carte d'origine du projet" : `Nouvelle campagne : ${uiNum(plan.stats.objects)} arbres, buissons et rochers`);
+      if (plan) this.toast(ev.shiftKey ? t('toast.land.orig') : t('toast.land.new', { n: uiNum(plan.stats.objects) }));
     });
     $('#btn-shot').addEventListener('click', () => {
       const a = document.createElement('a');
@@ -194,7 +214,7 @@ export class CityUI {
       const res = this.analysis.files.filter((f) => f.path.toLowerCase().includes(q))
         .sort((a, b) => (a.name.toLowerCase().startsWith(q) ? -1 : 0) - (b.name.toLowerCase().startsWith(q) ? -1 : 0) || a.rank - b.rank)
         .slice(0, 12);
-      list.innerHTML = res.map((f) => `<button data-id="${f.id}"><span>${KINDS[f.kind].icon}</span><b>${uiEsc(f.name)}</b><small>${uiEsc(f.dir || '/')}</small></button>`).join('') || '<div class="empty">Aucun bâtiment trouvé</div>';
+      list.innerHTML = res.map((f) => `<button data-id="${f.id}"><span>${KINDS[f.kind].icon}</span><b>${uiEsc(f.name)}</b><small>${uiEsc(f.dir || '/')}</small></button>`).join('') || `<div class="empty">${uiEsc(t('search.none'))}</div>`;
       list.hidden = false;
     });
     input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') list.querySelector('button')?.click(); });
@@ -213,15 +233,15 @@ export class CityUI {
   }
 
   async _ingest(root, entries) {
-    this._loading(`Analyse de « ${root} »…`);
+    this._loading(t('load.analyze', { name: root }));
     try {
-      const analysis = await uiReadFiles(entries, root, (i, n) => this._loading(`Lecture des fichiers… ${i}/${n}`));
-      if (!analysis.files.length) { this._loading(null); this.toast('Aucun fichier exploitable dans ce dossier.'); return; }
+      const analysis = await uiReadFiles(entries, root, (i, n) => this._loading(t('load.read', { i, n })));
+      if (!analysis.files.length) { this._loading(null); this.toast(t('toast.nofiles')); return; }
       this.load(analysis);
     } catch (err) {
       console.error(err);
       this._loading(null);
-      this.toast("Impossible d'analyser ce dossier : " + err.message);
+      this.toast(t('toast.analyzeErr', { msg: err.message }));
     }
   }
 
@@ -232,7 +252,7 @@ export class CityUI {
   }
 
   load(analysis) {
-    this._loading('Construction de la ville…');
+    this._loading(t('load.build'));
     setTimeout(async () => {
       try {
         await assetsReady();
@@ -245,12 +265,12 @@ export class CityUI {
         this._stats(analysis, city);
         this._legend(analysis);
         this.select(null);
-        this._evolution(analysis);
+        if (this._noEvolution) this._noEvolution = false; else this._evolution(analysis);
         document.title = `${analysis.name} — Bitropolis`;
-        if (analysis.truncated) this.toast(`Projet géant : ${uiNum(analysis.truncated)} fichiers mineurs non affichés.`);
+        if (analysis.truncated) this.toast(t('toast.truncated', { n: uiNum(analysis.truncated) }));
       } catch (err) {
         console.error(err);
-        this.toast('Erreur pendant la construction : ' + err.message);
+        this.toast(t('toast.buildErr', { msg: err.message }));
       }
       this._loading(null);
     }, 30);
@@ -270,43 +290,41 @@ export class CityUI {
     const events = [
       ...grown.map((g) => ({
         id: byPath.get(g.path).id, type: 'grown',
-        label: fam(g.from) === fam(g.to) ? `${modelLabel(g.from)} → N${stage(g.to)}` : `${modelLabel(g.from)} → ${modelLabel(g.to)}`
+        label: fam(g.from) === fam(g.to) ? `${modelName(g.from)} → N${stage(g.to)}` : `${modelName(g.from)} → ${modelName(g.to)}`
       })),
       ...added.map((p) => ({ id: byPath.get(p).id, type: 'new', label: '🆕 ' + byPath.get(p).name }))
     ];
     this.evolution = { grown: grown.length, added: added.length, removed: removed.length, labels: new Map(events.map((e) => [e.id, e.label])) };
     if (events.length) this.engine.animateGrowth(events);
     const parts = [];
-    if (grown.length) parts.push(`📈 ${uiNum(grown.length)} bâtiment${grown.length > 1 ? 's ont' : ' a'} grandi`);
-    if (added.length) parts.push(`🆕 ${uiNum(added.length)} nouveau${added.length > 1 ? 'x' : ''}`);
-    if (removed.length) parts.push(`🏚️ ${uiNum(removed.length)} démoli${removed.length > 1 ? 's' : ''}`);
-    if (parts.length) setTimeout(() => this.toast(parts.join(' · ') + ' depuis la dernière visite'), 900);
+    if (grown.length) parts.push(tp('evo.grown', grown.length));
+    if (added.length) parts.push(tp('evo.added', added.length));
+    if (removed.length) parts.push(tp('evo.removed', removed.length));
+    if (parts.length) setTimeout(() => this.toast(parts.join(' · ') + t('evo.since')), 900);
   }
 
   _stats(a, city) {
     $('#project-name').textContent = a.name;
     const chips = [
-      ['🏢', uiNum(a.stats.files), 'bâtiments'],
-      ['📝', uiNum(a.stats.loc), 'lignes'],
-      ['🏘️', uiNum(city.districts.length), 'quartiers'],
-      ['🛣️', uiNum(city.roads.length), 'routes'],
-      city.grid ? ['🗿', uiNum(city.roundabouts.length), 'monuments'] : ['⭕', uiNum(city.roundabouts.length), 'rond-points'],
-      ['🔗', uiNum(a.stats.edges), 'liaisons']
+      ['🏢', uiNum(a.stats.files), t('stat.buildings')],
+      ['📝', uiNum(a.stats.loc), t('stat.lines')],
+      ['🏘️', uiNum(city.districts.length), t('stat.districts')],
+      ['🛣️', uiNum(city.roads.length), t('stat.roads')],
+      city.grid ? ['🗿', uiNum(city.roundabouts.length), t('stat.monuments')] : ['⭕', uiNum(city.roundabouts.length), t('stat.roundabouts')],
+      ['🔗', uiNum(a.stats.edges), t('stat.links')]
     ];
     $('#stats').innerHTML = chips.map(([i, v, l]) => `<span class="chip" title="${l}">${i} <b>${v}</b> ${l}</span>`).join('');
   }
 
   _legend(a) {
     const counts = a.stats.kinds;
+    const item = (ic, key, sep) => `<li${sep ? ' class="sep"' : ''}><span class="ic">${ic}</span><span><b>${uiEsc(t(key + '.t'))}</b><small>${uiEsc(t(key + '.d'))}</small></span></li>`;
     $('#legend-items').innerHTML = Object.entries(KINDS)
       .filter(([k]) => counts[k])
-      .map(([k, v]) => `<li><span class="ic">${v.icon}</span><span><b>${v.label}</b><small>${v.role}</small></span><em>${counts[k]}</em></li>`).join('') +
+      .map(([k, v]) => `<li><span class="ic">${v.icon}</span><span><b>${uiEsc(kindLabel(k))}</b><small>${uiEsc(kindRole(k))}</small></span><em>${counts[k]}</em></li>`).join('') +
       (this.engine.city && this.engine.city.grid
-        ? `<li class="sep"><span class="ic">🏗️</span><span><b>Stades N1 → N8</b><small>Chaque bâtiment monte d'un stade quand son fichier grandit (lignes, fichiers qui l'importent, complexité) : cabane → tour, éolienne → centrale nucléaire.</small></span></li>` +
-          `<li><span class="ic">🛣️</span><span><b>Routes</b><small>Les dépendances circulent par les routes : plus il en passe, plus l'avenue monte en gamme (N1 → N8).</small></span></li>` +
-          `<li><span class="ic">🗿</span><span><b>Monuments</b><small>Sur les places au bord des avenues les plus fréquentées.</small></span></li>`
-        : `<li class="sep"><span class="ic">⭐</span><span><b>Niveaux</b><small>Plus un fichier est important (taille, fichiers qui en dépendent, complexité), plus son bâtiment grandit : maison → gratte-ciel.</small></span></li>` +
-          `<li><span class="ic">⭕</span><span><b>Rond-points</b><small>Carrefours où passent le plus de dépendances entre quartiers.</small></span></li>`);
+        ? item('🏗️', 'lg.stages', true) + item('🛣️', 'lg.roads') + item('🗿', 'lg.monuments')
+        : item('⭐', 'lg.levels', true) + item('⭕', 'lg.rb'));
   }
 
   _tooltip(hit, x, y) {
@@ -315,14 +333,14 @@ export class CityUI {
     if (hit.type === 'file') {
       const f = this.analysis.files[hit.id];
       const lot = this.engine.city.lots[f.id];
-      const level = lot && lot.model ? `${uiEsc(lot.familyName)} · stade ${lot.stage}/${lot.stages}` : `${uiTierName(f)} <i>${uiStars(f.tier)}</i>`;
-      tip.innerHTML = `<b>${KINDS[f.kind].icon} ${uiEsc(f.name)}</b><span>${uiEsc(KINDS[f.kind].label)} · ${level}</span><small>${uiEsc(f.dir || '/')} · ${uiNum(f.loc)} lignes</small>`;
+      const level = lot && lot.model ? `${uiEsc(famName(lot.family, lot.familyName))} · ${t('tip.stage', { s: lot.stage, n: lot.stages })}` : `${uiTierName(f)} <i>${uiStars(f.tier)}</i>`;
+      tip.innerHTML = `<b>${KINDS[f.kind].icon} ${uiEsc(f.name)}</b><span>${uiEsc(kindLabel(f.kind))} · ${level}</span><small>${uiEsc(f.dir || '/')} · ${t('tip.lines', { n: uiNum(f.loc) })}</small>`;
     } else if (this.engine.city.grid) {
       const r = this.engine.roundabouts[hit.index];
-      tip.innerHTML = `<b>🗿 Monument</b><span>${uiNum(r.traffic)} dépendances passent devant</span><small>${uiEsc(r.labels[0])} ⇄ ${uiEsc(r.labels[1])}</small>`;
+      tip.innerHTML = `<b>${t('tip.mon.t')}</b><span>${t('tip.mon.d', { n: uiNum(r.traffic) })}</span><small>${uiEsc(r.labels[0])} ⇄ ${uiEsc(r.labels[1])}</small>`;
     } else {
       const r = this.engine.roundabouts[hit.index];
-      tip.innerHTML = `<b>⭕ Rond-point</b><span>${uiNum(r.traffic)} dépendances se croisent ici</span><small>${uiEsc(r.labels[0])} ⇄ ${uiEsc(r.labels[1])}</small>`;
+      tip.innerHTML = `<b>${t('tip.rb.t')}</b><span>${t('tip.rb.d', { n: uiNum(r.traffic) })}</span><small>${uiEsc(r.labels[0])} ⇄ ${uiEsc(r.labels[1])}</small>`;
     }
     tip.hidden = false;
     const w = tip.offsetWidth, h = tip.offsetHeight;
@@ -337,20 +355,20 @@ export class CityUI {
     const a = this.analysis, f = a.files[id], k = KINDS[f.kind];
     const link = (j) => { const g = a.files[j]; return `<button class="dep" data-goto="${j}"><span>${KINDS[g.kind].icon}</span>${uiEsc(g.name)}<small>${uiEsc(g.dir || '/')}</small></button>`; };
     const metrics = [
-      ['Lignes de code', uiNum(f.loc)], ['Taille', uiBytes(f.size)], ['Fonctions', uiNum(f.funcs)],
-      ['Classes', uiNum(f.classes)], ['Branches', uiNum(f.branches)], ['TODO / FIXME', uiNum(f.todos)],
-      ['Langage', uiEsc(f.lang)], ['Importance', `#${f.rank} / ${a.files.length}`], ['Paquets externes', uiNum(f.external)]
+      [t('m.loc'), uiNum(f.loc)], [t('m.size'), uiBytes(f.size)], [t('m.funcs'), uiNum(f.funcs)],
+      [t('m.classes'), uiNum(f.classes)], [t('m.branches'), uiNum(f.branches)], [t('m.todos'), uiNum(f.todos)],
+      [t('m.lang'), uiEsc(f.lang === 'Fichier' ? t('lang.file') : f.lang === 'Texte' ? t('lang.text') : f.lang)], [t('m.rank'), `#${f.rank} / ${a.files.length}`], [t('m.external'), uiNum(f.external)]
     ];
     $('#panel-body').innerHTML = `
-      <div class="kind">${k.icon} ${uiEsc(k.label)}<small>${uiEsc(k.role)}</small></div>
+      <div class="kind">${k.icon} ${uiEsc(kindLabel(f.kind))}<small>${uiEsc(kindRole(f.kind))}</small></div>
       <h2>${uiEsc(f.name)}</h2>
       <div class="path">${uiEsc(f.path)}</div>
       ${this._growthHTML(f)}
       <div class="metrics">${metrics.map(([l, v]) => `<div><small>${l}</small><b>${v}</b></div>`).join('')}</div>
-      <h3><i class="dot out"></i>Utilise <em>${f.imports.length}</em></h3>
-      <div class="deps">${f.imports.map(link).join('') || '<p class="none">Aucune dépendance interne.</p>'}</div>
-      <h3><i class="dot in"></i>Utilisé par <em>${f.importedBy.length}</em></h3>
-      <div class="deps">${f.importedBy.map(link).join('') || '<p class="none">Personne ne l\'importe (encore).</p>'}</div>`;
+      <h3><i class="dot out"></i>${t('p.uses')} <em>${f.imports.length}</em></h3>
+      <div class="deps">${f.imports.map(link).join('') || `<p class="none">${uiEsc(t('p.noDeps'))}</p>`}</div>
+      <h3><i class="dot in"></i>${t('p.usedBy')} <em>${f.importedBy.length}</em></h3>
+      <div class="deps">${f.importedBy.map(link).join('') || `<p class="none">${uiEsc(t('p.noUsers'))}</p>`}</div>`;
     panel.classList.add('open');
   }
 
@@ -361,10 +379,10 @@ export class CityUI {
     const pct = lot.next ? Math.round((100 * (lot.points - lot.start)) / Math.max(1, span)) : 100;
     const ev = this.evolution && this.evolution.labels.get(f.id);
     return `<div class="growth">
-      <div class="g-head"><b>🏗️ ${uiEsc(lot.familyName)}</b><span>stade ${lot.stage} / ${lot.stages}</span></div>
+      <div class="g-head"><b>🏗️ ${uiEsc(famName(lot.family, lot.familyName))}</b><span>${t('g.stage', { s: lot.stage, n: lot.stages })}</span></div>
       <div class="g-bar"><i style="width:${Math.max(3, Math.min(100, pct))}%"></i></div>
-      <small>${lot.next ? `${uiNum(lot.points)} / ${uiNum(lot.next)} points : encore ~${uiNum(lot.next - lot.points)} pour le stade suivant (1 ligne = 1 point, 15 par fichier qui l'importe).` : 'Stade maximum atteint 🎉'}</small>
-      ${ev ? `<em class="g-ev">📈 Depuis la dernière visite : ${uiEsc(ev)}</em>` : ''}
+      <small>${lot.next ? t('g.progress', { p: uiNum(lot.points), next: uiNum(lot.next), left: uiNum(lot.next - lot.points) }) : t('g.max')}</small>
+      ${ev ? `<em class="g-ev">${t('g.since', { ev: uiEsc(ev) })}</em>` : ''}
     </div>`;
   }
 
@@ -373,23 +391,23 @@ export class CityUI {
     const r = this.engine.roundabouts[i];
     if (this.engine.city.grid) {
       $('#panel-body').innerHTML = `
-      <div class="kind">🗿 Monument<small>Place d'une avenue très fréquentée</small></div>
-      <h2>${uiNum(r.traffic)} liaisons</h2>
-      <p class="rb">${uiNum(r.traffic)} dépendances passent devant ce monument, surtout entre <b>${uiEsc(r.labels[0])}</b> et <b>${uiEsc(r.labels[1])}</b>.</p>`;
+      <div class="kind">${t('mon.kind')}<small>${t('mon.sub')}</small></div>
+      <h2>${tp('links', r.traffic)}</h2>
+      <p class="rb">${t('mon.text', { n: uiNum(r.traffic), a: uiEsc(r.labels[0]), b: uiEsc(r.labels[1]) })}</p>`;
       $('#panel').classList.add('open');
       return;
     }
     $('#panel-body').innerHTML = `
-      <div class="kind">⭕ Rond-point<small>Carrefour de dépendances</small></div>
-      <h2>${uiNum(r.traffic)} liaisons</h2>
-      <p class="rb">Ce rond-point relie <b>${uiEsc(r.labels[0])}</b> et <b>${uiEsc(r.labels[1])}</b> : ${uiNum(r.traffic)} imports traversent la route qui les sépare.</p>`;
+      <div class="kind">${t('rb.kind')}<small>${t('rb.sub')}</small></div>
+      <h2>${tp('links', r.traffic)}</h2>
+      <p class="rb">${t('rb.text', { n: uiNum(r.traffic), a: uiEsc(r.labels[0]), b: uiEsc(r.labels[1]) })}</p>`;
     $('#panel').classList.add('open');
   }
 
   toast(msg) {
-    const t = $('#toast');
-    t.textContent = msg; t.hidden = false;
+    const el = $('#toast');
+    el.textContent = msg; el.hidden = false;
     clearTimeout(this._toastT);
-    this._toastT = setTimeout(() => (t.hidden = true), 4200);
+    this._toastT = setTimeout(() => (el.hidden = true), 4200);
   }
 }

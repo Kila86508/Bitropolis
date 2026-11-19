@@ -12,6 +12,7 @@ Je größer eine Datei wird, desto weiter steigt ihr Gebäude auf.
 [![Live-Demo](https://img.shields.io/badge/▶_live-demo-ff7a59?style=for-the-badge)](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)
 [![100 % lokal](https://img.shields.io/badge/100_%25-lokal-2a9d8f?style=for-the-badge)](#-100--lokal-wirklich)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A5_18-457b9d?style=for-the-badge)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/bitropolis?style=for-the-badge&color=cb3837)](https://www.npmjs.com/package/bitropolis)
 [![MIT-Lizenz](https://img.shields.io/badge/code-MIT-6d7178?style=for-the-badge)](LICENSE)
 
 ![Bitropolis: eine 3D-Stadt, erzeugt aus einem Code-Projekt](docs/hero.jpg)
@@ -80,9 +81,15 @@ Je größer eine Datei wird, desto weiter steigt ihr Gebäude auf.
 
 ### Option 1: ohne Installation
 
-Öffne die **[Live-Demo](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)** oder lokal [`dist/bitropolis.html`](dist/bitropolis.html) (Doppelklick), dann **ziehe deinen Ordner hinein** oder klicke auf „Ouvrir un dossier“ (Ordner öffnen). Alles passiert in deinem Browser: Nichts wird hochgeladen.
+Öffne die **[Live-Demo](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)** oder lokal [`dist/bitropolis.html`](dist/bitropolis.html) (Doppelklick), dann **ziehe deinen Ordner hinein** oder klicke auf „📁 Code-Ordner öffnen“. Alles passiert in deinem Browser: Nichts wird hochgeladen.
 
 ### Option 2: Kommandozeile (Node.js ≥ 18)
+
+```bash
+npx bitropolis ~/code/mein-projekt
+```
+
+Oder aus dem Quellcode:
 
 ```bash
 git clone https://github.com/Kila86508/Bitropolis.git
@@ -99,6 +106,7 @@ bitropolis [ordner] [optionen]
   -n, --name <name>     Name der Stadt
       --json            Exportiert zusätzlich die Rohanalyse (.city.json)
       --no-open         Browser nicht öffnen
+  -l, --lang <xx>       Sprache: en, fr, de, it, es, zh, ru
 ```
 
 Die erzeugte Datei ist **eigenständig**: Schick sie einem Freund, sie öffnet sich ohne Server und ohne Internet.
@@ -115,9 +123,9 @@ Die erzeugte Datei ist **eigenständig**: Schick sie einem Freund, sie öffnet s
 | Datei suchen | `/` |
 | Auswahl aufheben | `Esc` |
 
-Werkzeugleiste: 🌙 Tag / Nacht · 🔗 alle Abhängigkeiten · 🚗 Verkehr · 🏷️ Viertel · 🎯 zentrieren · 🎲 neue Landschaft · 📸 Screenshot · Thema.
+Werkzeugleiste: 🌙 Tag / Nacht · 🔗 alle Abhängigkeiten · 🚗 Verkehr · 🏷️ Viertel · 🎯 zentrieren · 🎲 neue Landschaft · 📸 Screenshot · Thema · Sprache.
 
-> Die Oberfläche ist vorerst auf Französisch.
+> 🌐 Oberfläche und CLI sprechen **Deutsch, Englisch, Französisch, Italienisch, Spanisch, Chinesisch und Russisch**: Die Sprache des Browsers (bzw. des Systems) wird automatisch gewählt, über das Sprachmenü in der Werkzeugleiste lässt sie sich ändern.
 
 ## 🏙️ Und bei einem richtig großen Projekt?
 

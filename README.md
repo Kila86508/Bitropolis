@@ -12,6 +12,7 @@ Plus un fichier grossit, plus son bâtiment monte en gamme.
 [![Démo en ligne](https://img.shields.io/badge/▶_démo-en_ligne-ff7a59?style=for-the-badge)](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)
 [![100 % local](https://img.shields.io/badge/100_%25-local-2a9d8f?style=for-the-badge)](#-100--local-vraiment)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A5_18-457b9d?style=for-the-badge)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/bitropolis?style=for-the-badge&color=cb3837)](https://www.npmjs.com/package/bitropolis)
 [![Licence MIT](https://img.shields.io/badge/code-MIT-6d7178?style=for-the-badge)](LICENSE)
 
 ![Bitropolis : une ville 3D générée à partir d'un projet de code](docs/hero.jpg)
@@ -80,9 +81,15 @@ Plus un fichier grossit, plus son bâtiment monte en gamme.
 
 ### Option 1 : sans rien installer
 
-Ouvre la **[démo en ligne](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, ou [`dist/bitropolis.html`](dist/bitropolis.html) en local (double-clic), puis **glisse-dépose ton dossier** ou clique sur « Ouvrir un dossier ». Tout se passe dans ton navigateur : rien n'est envoyé.
+Ouvre la **[démo en ligne](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, ou [`dist/bitropolis.html`](dist/bitropolis.html) en local (double-clic), puis **glisse-dépose ton dossier** ou clique sur « 📁 Ouvrir un dossier de code ». Tout se passe dans ton navigateur : rien n'est envoyé.
 
 ### Option 2 : en ligne de commande (Node.js ≥ 18)
+
+```bash
+npx bitropolis ~/code/mon-projet
+```
+
+Ou depuis les sources :
 
 ```bash
 git clone https://github.com/Kila86508/Bitropolis.git
@@ -99,6 +106,7 @@ bitropolis [dossier] [options]
   -n, --name <nom>      Nom de la ville
       --json            Exporte aussi l'analyse brute (.city.json)
       --no-open         Ne pas ouvrir le navigateur
+  -l, --lang <xx>       Langue : en, fr, de, it, es, zh, ru
 ```
 
 Le fichier généré est **autonome** : envoie-le à un ami, il s'ouvre sans serveur ni Internet.
@@ -115,7 +123,9 @@ Le fichier généré est **autonome** : envoie-le à un ami, il s'ouvre sans ser
 | Chercher un fichier | `/` |
 | Désélectionner | `Échap` |
 
-Barre d'outils : 🌙 jour / nuit · 🔗 toutes les liaisons · 🚗 trafic · 🏷️ quartiers · 🎯 recentrer · 🎲 nouvelle campagne · 📸 capture · thème.
+Barre d'outils : 🌙 jour / nuit · 🔗 toutes les liaisons · 🚗 trafic · 🏷️ quartiers · 🎯 recentrer · 🎲 nouvelle campagne · 📸 capture · thème · langue.
+
+> 🌐 L'interface et la CLI parlent **français, anglais, allemand, italien, espagnol, chinois et russe** : la langue du navigateur (ou du système) est choisie automatiquement, et le menu de langue de la barre d'outils permet d'en changer.
 
 ## 🏙️ Et sur un vrai gros projet ?
 

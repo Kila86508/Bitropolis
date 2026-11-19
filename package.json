@@ -1,38 +1,53 @@
 {
   "name": "bitropolis",
-  "version": "0.1.0",
-  "description": "Transforme ton code en ville 3D low poly. 100 % local.",
+  "version": "0.2.0",
+  "description": "Turn your code into a living 3D city: folders become districts, files become buildings that grow with your code. 100% local.",
+  "keywords": [
+    "code",
+    "visualization",
+    "codecity",
+    "city",
+    "3d",
+    "low-poly",
+    "threejs",
+    "dependency-graph",
+    "cli",
+    "developer-tools"
+  ],
+  "homepage": "https://kila86508.github.io/Bitropolis/dist/bitropolis.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kila86508/Bitropolis.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Kila86508/Bitropolis/issues"
+  },
+  "author": "Kila86508",
+  "license": "MIT",
+  "type": "module",
   "main": "src/core/analyze.js",
+  "bin": {
+    "bitropolis": "bin/bitropolis.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "scripts/bundle.js",
+    "scripts/assets.js",
+    
+    "dist/bitropolis.html",
+    "LICENSE",
+    "README*.md"
+  ],
   "scripts": {
     "build": "node scripts/build.js",
     "start": "node bin/bitropolis.js .",
     "test": "node --test"
   },
-  "keywords": [
-    "code",
-    "visualization",
-    "city",
-    "3d",
-    "low-poly",
-    "codecity",
-    "threejs"
-  ],
-  "author": "",
-  "license": "MIT",
-  "dependencies": {
-    "three": "^0.160.0"
-  },
-  "type": "module",
-  "bin": {
-    "bitropolis": "bin/bitropolis.js"
-  },
-  "files": [
-    "bin",
-    "src",
-    "scripts",
-    "dist"
-  ],
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "three": "^0.160.0"
   }
 }

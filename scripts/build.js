@@ -12,7 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const demoDir = process.env.BITROPOLIS_DEMO;
 const demo = demoDir
   ? analyzeProject(scanDirectory(demoDir), { name: path.basename(path.resolve(demoDir)) })
-  : analyzeProject(demoProject(), { name: 'hotel-booking (démo)' });
+  : analyzeProject(demoProject(), { name: 'hotel-booking (demo)' });
 const html = renderHTML({ data: null, demo });
 fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'dist/bitropolis.html'), html);

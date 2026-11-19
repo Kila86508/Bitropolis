@@ -9,6 +9,7 @@ import { VEHICLES } from '../core/catalog.js';
 import { packReady } from './assets.js';
 import { buildPackCity, buildPackVehicles, makePackMaterial, CITY_Y } from './citypack.js';
 import { TrafficSim } from './traffic.js';
+import { tp } from './i18n.js';
 
 const BASE_Y = 0.32; // hauteur des parcelles (trottoir + dalle)
 
@@ -135,6 +136,10 @@ export class CityRenderer {
     this.timeU = { value: 0 }; // horloge des lumières (fenêtres qui s'allument / s'éteignent)
     this.night = false;
     this.nightMix = 0;
+    // Cycle jour / nuit automatique : 2 min de jour, 2 min de nuit, crépuscule et aube progressifs
+    this.dayCycle = { on: true, clock: 0, day: 120, night: 120, fade: 10 };
+    this.onNightChange = null;
+    this._fastFade = false;
     this.state = { traffic: true, deps: false, labels: true };
     this.raycaster = new THREE.Raycaster();
     this.lib = rdGeoLib();
@@ -684,7 +689,7 @@ export class CityRenderer {
     const tops = city.districts.filter((d) => d.depth === 1);
     for (const d of tops) {
       const tint = theme.districtTints[d.district % theme.districtTints.length];
-      const sp = this._label(d.name, `${d.count} fichier${d.count > 1 ? 's' : ''}`, tint);
+      const sp = this._label(d.name, tp("files", d.count), tint);
       let maxH = 4;
       for (const f of this.analysis.files) {
         const b = this.buildings[f.id];
@@ -737,7 +742,13 @@ export class CityRenderer {
     return new THREE.QuadraticBezierCurve3(pa, mid, pb);
   }
 
-  setNight(on) { this.night = on; }
+  // Bouton 🌙 : bascule tout de suite et repart pour une phase complète (le cycle continue ensuite)
+  setNight(on) {
+    this.night = on; this._fastFade = true;
+    const c = this.dayCycle;
+    c.clock = on ? c.day : 0;
+  }
+  setDayCycle(on) { this.dayCycle.on = on; }
   setTraffic(on) { this.state.traffic = on; }
   setLabels(on) { this.state.labels = on; if (this.labels) this.labels.visible = on; }
   setDeps(on) { this.state.deps = on; if (on) this._buildDeps(); if (this.depGroup) this.depGroup.visible = on; }
@@ -837,11 +848,21 @@ export class CityRenderer {
     const dt = Math.min(0.05, this.clock.getDelta());
     this.controls.update(dt);
     if (this.city) {
+      const cyc = this.dayCycle;
+      if (cyc.on) {
+        cyc.clock = (cyc.clock + dt) % (cyc.day + cyc.night);
+        const wantNight = cyc.clock >= cyc.day;
+        if (wantNight !== this.night) {
+          this.night = wantNight; this._fastFade = false;
+          if (this.onNightChange) this.onNightChange(wantNight);
+        }
+      }
       const target = this.night ? 1 : 0;
       if (Math.abs(this.nightMix - target) > 0.001) {
-        this.nightMix += Math.sign(target - this.nightMix) * Math.min(Math.abs(target - this.nightMix), dt * 1.4);
+        const speed = this._fastFade ? 1.4 : 1 / cyc.fade;
+        this.nightMix += Math.sign(target - this.nightMix) * Math.min(Math.abs(target - this.nightMix), dt * speed);
         this._applyNight(true);
-      }
+      } else this._fastFade = false;
       this.timeU.value += dt;
       this._updateCars(dt);
       this._updateGrowth(dt);

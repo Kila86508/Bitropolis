@@ -16,6 +16,7 @@ const MODULES = [
   'src/core/grid.js',
   'src/core/obf.js',
   'src/viewer/assets.js',
+  'src/viewer/i18n.js',
   'src/viewer/themes/lowpoly.js',
   'src/viewer/themes/index.js',
   'src/viewer/controls.js',

@@ -2,6 +2,7 @@
 import { CityRenderer } from './render.js';
 import { CityUI } from './ui.js';
 import { assetsReady } from './assets.js';
+import { t, applyI18n } from './i18n.js';
 
 function bootBitropolis() {
   assetsReady(); // décompression des modèles en arrière-plan dès l'ouverture
@@ -16,7 +17,8 @@ function bootBitropolis() {
   try {
     engine = new CityRenderer(document.getElementById('city'));
   } catch (err) {
-    document.getElementById('welcome').querySelector('.lead').textContent = "WebGL n'est pas disponible dans ce navigateur : impossible de dessiner la ville.";
+    applyI18n();
+    document.getElementById('welcome').querySelector('.lead').textContent = t('webgl');
     throw err;
   }
   const ui = new CityUI(engine);

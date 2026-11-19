@@ -12,6 +12,7 @@ Cuanto más crece un archivo, más sube de nivel su edificio.
 [![Demo en línea](https://img.shields.io/badge/▶_demo-en_línea-ff7a59?style=for-the-badge)](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)
 [![100 % local](https://img.shields.io/badge/100_%25-local-2a9d8f?style=for-the-badge)](#-100--local-de-verdad)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A5_18-457b9d?style=for-the-badge)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/bitropolis?style=for-the-badge&color=cb3837)](https://www.npmjs.com/package/bitropolis)
 [![Licencia MIT](https://img.shields.io/badge/código-MIT-6d7178?style=for-the-badge)](LICENSE)
 
 ![Bitropolis: una ciudad 3D generada a partir de un proyecto de código](docs/hero.jpg)
@@ -80,9 +81,15 @@ Cuanto más crece un archivo, más sube de nivel su edificio.
 
 ### Opción 1: sin instalar nada
 
-Abre la **[demo en línea](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, o [`dist/bitropolis.html`](dist/bitropolis.html) en local (doble clic), y luego **arrastra tu carpeta** o haz clic en «Ouvrir un dossier» (abrir una carpeta). Todo ocurre en tu navegador: no se envía nada.
+Abre la **[demo en línea](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, o [`dist/bitropolis.html`](dist/bitropolis.html) en local (doble clic), y luego **arrastra tu carpeta** o haz clic en «📁 Abrir una carpeta de código». Todo ocurre en tu navegador: no se envía nada.
 
 ### Opción 2: línea de comandos (Node.js ≥ 18)
+
+```bash
+npx bitropolis ~/code/mi-proyecto
+```
+
+O desde el código fuente:
 
 ```bash
 git clone https://github.com/Kila86508/Bitropolis.git
@@ -99,6 +106,7 @@ bitropolis [carpeta] [opciones]
   -n, --name <nombre>   Nombre de la ciudad
       --json            Exporta también el análisis en bruto (.city.json)
       --no-open         No abrir el navegador
+  -l, --lang <xx>       Idioma: en, fr, de, it, es, zh, ru
 ```
 
 El archivo generado es **autónomo**: envíaselo a un amigo, se abre sin servidor ni Internet.
@@ -115,9 +123,9 @@ El archivo generado es **autónomo**: envíaselo a un amigo, se abre sin servido
 | Buscar un archivo | `/` |
 | Deseleccionar | `Esc` |
 
-Barra de herramientas: 🌙 día / noche · 🔗 todas las dependencias · 🚗 tráfico · 🏷️ barrios · 🎯 recentrar · 🎲 nuevo campo · 📸 captura · tema.
+Barra de herramientas: 🌙 día / noche · 🔗 todas las dependencias · 🚗 tráfico · 🏷️ barrios · 🎯 recentrar · 🎲 nuevo campo · 📸 captura · tema · idioma.
 
-> Por ahora, la interfaz está en francés.
+> 🌐 La interfaz y la CLI hablan **español, inglés, francés, alemán, italiano, chino y ruso**: se elige automáticamente el idioma del navegador (o del sistema), y el menú de idioma de la barra de herramientas permite cambiarlo.
 
 ## 🏙️ ¿Y con un proyecto realmente grande?
 

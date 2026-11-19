@@ -168,33 +168,34 @@ body:not(.has-city) #help { display: none; }
 </header>
 
 <div class="search">
-  <input id="search" type="search" placeholder="Chercher un fichier…  ( / )" autocomplete="off" spellcheck="false">
+  <input id="search" type="search" data-i18n-ph="search.ph" placeholder="Chercher un fichier…  ( / )" autocomplete="off" spellcheck="false">
   <div id="search-results" class="glass" hidden></div>
 </div>
 
 <nav id="toolbar" class="glass">
-  <button id="btn-night" title="Jour / nuit">🌙<span class="lbl"> Nuit</span></button>
-  <button id="btn-deps" title="Afficher toutes les dépendances">🔗<span class="lbl"> Liens</span></button>
-  <button id="btn-traffic" class="on" title="Circulation">🚗<span class="lbl"> Trafic</span></button>
-  <button id="btn-labels" class="on" title="Noms des quartiers">🏷️<span class="lbl"> Quartiers</span></button>
-  <button id="btn-home" title="Recentrer la vue">🎯</button>
-  <button id="btn-land" title="Nouvelle campagne : relief, lacs, forêts (Maj+clic : carte d'origine du projet)">🎲<span class="lbl"> Carte</span></button>
-  <button id="btn-shot" title="Capture d'écran (PNG)">📸</button>
-  <select id="theme" title="Thème"></select>
-  <button id="btn-open" title="Ouvrir un autre dossier">📁<span class="lbl"> Ouvrir</span></button>
+  <button id="btn-night" data-i18n-title="btn.night.t" title="Jour / nuit">🌙<span class="lbl" data-i18n="btn.night.l"> Nuit</span></button>
+  <button id="btn-deps" data-i18n-title="btn.deps.t" title="Afficher toutes les dépendances">🔗<span class="lbl" data-i18n="btn.deps.l"> Liens</span></button>
+  <button id="btn-traffic" class="on" data-i18n-title="btn.traffic.t" title="Circulation">🚗<span class="lbl" data-i18n="btn.traffic.l"> Trafic</span></button>
+  <button id="btn-labels" class="on" data-i18n-title="btn.labels.t" title="Noms des quartiers">🏷️<span class="lbl" data-i18n="btn.labels.l"> Quartiers</span></button>
+  <button id="btn-home" data-i18n-title="btn.home.t" title="Recentrer la vue">🎯</button>
+  <button id="btn-land" data-i18n-title="btn.land.t" title="Nouvelle campagne : relief, lacs, forêts (Maj+clic : carte d'origine du projet)">🎲<span class="lbl" data-i18n="btn.land.l"> Carte</span></button>
+  <button id="btn-shot" data-i18n-title="btn.shot.t" title="Capture d'écran (PNG)">📸</button>
+  <select id="theme" data-i18n-title="theme.title" title="Thème"></select>
+  <select id="lang" data-i18n-title="lang.title" title="Langue"></select>
+  <button id="btn-open" data-i18n-title="btn.open.t" title="Ouvrir un autre dossier">📁<span class="lbl" data-i18n="btn.open.l"> Ouvrir</span></button>
 </nav>
 
 <aside id="legend" class="glass">
-  <button id="legend-toggle"><span>🗺️ Légende</span><span>▾</span></button>
+  <button id="legend-toggle"><span data-i18n="legend.title">🗺️ Légende</span><span>▾</span></button>
   <ul id="legend-items"></ul>
 </aside>
 
 <aside id="panel" class="glass">
-  <button id="panel-close" title="Fermer">✕</button>
+  <button id="panel-close" data-i18n-title="panel.close" title="Fermer">✕</button>
   <div id="panel-body"></div>
 </aside>
 
-<div id="help">Glisser : tourner · Clic droit : déplacer · Molette : zoom · Double-clic : s'approcher</div>
+<div id="help" data-i18n="help">Glisser : tourner · Clic droit : déplacer · Molette : zoom · Double-clic : s'approcher</div>
 <div id="tooltip" class="glass" hidden></div>
 
 <section id="welcome">
@@ -206,18 +207,18 @@ body:not(.has-city) #help { display: none; }
       <b style="height:62%;background:#fbe7a1;animation-delay:.52s"></b>
     </div>
     <h1>BITROPOLIS</h1>
-    <p class="lead">Ton code devient une ville. Chaque dossier est un quartier, chaque fichier un bâtiment.</p>
+    <p class="lead" data-i18n="welcome.lead">Ton code devient une ville. Chaque dossier est un quartier, chaque fichier un bâtiment.</p>
     <div class="actions">
-      <button id="welcome-open" class="btn primary">📁 Ouvrir un dossier de code</button>
-      <button id="welcome-demo" class="btn ghost">🏙️ Visiter la ville démo</button>
+      <button id="welcome-open" class="btn primary" data-i18n="welcome.open">📁 Ouvrir un dossier de code</button>
+      <button id="welcome-demo" class="btn ghost" data-i18n="welcome.demo">🏙️ Visiter la ville démo</button>
     </div>
-    <p class="note">Tu peux aussi <b>glisser-déposer</b> un dossier ici. <b>100 % local</b> : rien ne quitte ton ordinateur, aucune donnée n'est envoyée.<br>
+    <p class="note" data-i18n-html="welcome.note">Tu peux aussi <b>glisser-déposer</b> un dossier ici. <b>100 % local</b> : rien ne quitte ton ordinateur, aucune donnée n'est envoyée.<br>
       En ligne de commande : <code>npx bitropolis ./mon-projet</code></p>
   </div>
 </section>
 
-<div id="drop">Lâche ton dossier pour bâtir la ville 🏗️</div>
-<div id="loading" hidden><div class="glass"><i></i><span>Chargement…</span></div></div>
+<div id="drop" data-i18n="drop">Lâche ton dossier pour bâtir la ville 🏗️</div>
+<div id="loading" hidden><div class="glass"><i></i><span data-i18n="loading">Chargement…</span></div></div>
 <div id="toast" class="glass" hidden></div>
 <input id="folder-input" type="file" webkitdirectory directory multiple hidden>
 
