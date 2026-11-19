@@ -1,7 +1,7 @@
 // Bitropolis — affiche une ville en grille (src/core/grid.js) avec les modèles du pack de ville.
 // Sol, routes (8 niveaux), bâtiments à stades N1→N8, arbres et monuments : un InstancedMesh par modèle.
 import { CELL } from '../core/grid.js';
-import { TREES, GROUNDS } from '../core/catalog.js';
+import { TREES, GROUNDS, VARIANTS, chainOf, footprint, familyOf } from '../core/catalog.js';
 import { packGeometry, packModel } from './assets.js';
 import { hashString } from '../core/rules.js';
 
@@ -132,6 +132,62 @@ function packBox(model, x, z, ry, s, mirror = false) {
   return box;
 }
 
+// Apparences équivalentes d'un bâtiment : le modèle de son stade, ses variantes de couleur, et le modèle
+// de même emprise au même stade relatif dans les autres chaînes de son type (ex. Résidence N3 ⇄ Résidence L3).
+// Le stade et l'évolution du fichier ne changent pas : seule l'apparence peut être remplacée.
+// (cost : léger coût pour les stades voisins, afin de rester au plus près du stade réel)
+function packCandidates(f, lot) {
+  const out = new Map(); // clé du modèle affiché → { base, cost }
+  const [fw, fd] = footprint(lot.model);
+  const add = (m, cost) => {
+    if (!m || m.startsWith('@')) return;
+    const [w, d] = footprint(m);
+    if (w !== fw || d !== fd) return;
+    const info = packModel('city', m);
+    if (!info) return;
+    for (const k of [m, ...(info.alts || [])]) if (!out.has(k) || out.get(k).cost > cost) out.set(k, { base: m, cost });
+  };
+  add(lot.model, 0);
+  const own = chainOf(f), i = own.indexOf(lot.model), n = own.length;
+  if (i >= 0 && !/^Townhall|^TownHall/.test(lot.model)) {
+    for (const [, chain] of VARIANTS[f.kind] || []) {
+      const j = Math.round((i * (chain.length - 1)) / Math.max(1, n - 1));
+      add(chain[j], 0);
+      add(chain[j - 1], 0.35);   // stades voisins : silhouettes différentes, hauteurs proches
+      add(chain[j + 1], 0.35);
+    }
+  }
+  return [...out].map(([key, v]) => ({ key, base: v.base, cost: v.cost }));
+}
+
+// Choisit pour chaque bâtiment l'apparence qui ressemble le moins à ses voisins (rayon de 2 cases) :
+// même modèle à côté = forte pénalité, même modèle de base (variante de couleur) = moyenne, même famille = faible.
+function packAppearances(city, analysis) {
+  const shown = new Map(), placed = new Map();
+  const lots = analysis.files.map((f) => [f, city.lots[f.id]]).filter(([, l]) => l && !l.model.startsWith('@'))
+    .sort((a, b) => a[1].cz - b[1].cz || a[1].cx - b[1].cx);
+  for (const [f, l] of lots) {
+    const cands = packCandidates(f, l);
+    let best = cands[0], bestScore = Infinity;
+    for (const c of cands) {
+      let score = (c.key === l.model ? -0.6 : 0) + c.cost + (hashString(f.path + '|' + c.key) / 4294967296) * 0.4;
+      for (let z = l.cz - 2; z < l.cz + l.d + 2; z++) for (let x = l.cx - 2; x < l.cx + l.w + 2; x++) {
+        if (x >= l.cx && x < l.cx + l.w && z >= l.cz && z < l.cz + l.d) continue;
+        const e = placed.get(z * city.cols + x);
+        if (!e) continue;
+        const dist = Math.max(Math.max(l.cx - x, x - (l.cx + l.w - 1), 0), Math.max(l.cz - z, z - (l.cz + l.d - 1), 0));
+        if (e.key === c.key) score += 6 / dist;
+        else if (e.base === c.base) score += 2 / dist;
+        else if (familyOf(e.base) === familyOf(c.base)) score += 0.8 / dist;
+      }
+      if (score < bestScore) { bestScore = score; best = c; }
+    }
+    shown.set(f.id, best.key);
+    for (let z = l.cz; z < l.cz + l.d; z++) for (let x = l.cx; x < l.cx + l.w; x++) placed.set(z * city.cols + x, best);
+  }
+  return shown;
+}
+
 // → { group, buildings[id] = { id, box, lot, ref, matrix }, monuments, meshes: Map(model → InstancedMesh),
 //     parts: pièces mobiles à animer, fx: émetteurs d'effets (fumée, balise, fontaine) }
 export function buildPackCity(city, analysis, material, rng) {
@@ -158,6 +214,7 @@ export function buildPackCity(city, analysis, material, rng) {
 
   // --- bâtiments
   const buildings = new Array(analysis.files.length);
+  const appearance = packAppearances(city, analysis);
   const parts = [], fx = [];
   // pièces mobiles et points d'effets d'un modèle posé (matrix = placement du bâtiment)
   const attach = (owner, model) => {
@@ -187,11 +244,8 @@ export function buildPackCity(city, analysis, material, rng) {
     const h = hashString(f.path);
     const seed = ((h >>> 8) % 100000) / 100000;
     const mirror = !lot.model.startsWith('@') && !/^Townhall/.test(lot.model) && (h & 1) === 1;
-    let shown = lot.model;
+    const shown = appearance.get(f.id) || lot.model; // apparence choisie pour éviter les répétitions voisines
     if (!lot.model.startsWith('@')) {
-      // variantes du même modèle dans le pack (Commercial_N2_B…) : l'une d'elles, d'après le fichier
-      const alts = (packModel('city', lot.model) || {}).alts;
-      if (alts && alts.length) { const pick = ((h >>> 3) % 997) % (alts.length + 1); if (pick) shown = alts[pick - 1]; }
       ref = I.add(shown, lot.x, CITY_Y, lot.z, ry, CELL, CELL, mirror, seed);
       box = packBox(shown, lot.x, lot.z, ry, CELL, mirror);
     }
