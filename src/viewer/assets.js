@@ -45,6 +45,17 @@ function asKey(P, name) {
 }
 export function packModel(pack, name) { const P = asPacks[pack]; return (P && P.models[asKey(P, name)]) || null; }
 
+// Inverse de encode16 (scripts/assets.js) : deux plans d'octets → écarts → valeurs, composante par composante.
+export function asDecode16(buf, offset, n, stride, Ctor) {
+  const b = new Uint8Array(buf, offset, n * 2), out = new Ctor(n);
+  let o = 0;
+  for (let c = 0; c < stride; c++) {
+    let prev = 0;
+    for (let k = c; k < n; k += stride, o++) { prev = (prev + (b[o] | (b[n + o] << 8))) & 0xffff; out[k] = prev; }
+  }
+  return out;
+}
+
 // Géométrie d'un modèle (mise en cache). `warp(x, y, z)` peut déformer les sommets (non mis en cache).
 export function packGeometry(pack, name, warp = null) {
   const P = asPacks[pack];
@@ -52,7 +63,10 @@ export function packGeometry(pack, name, warp = null) {
   if (!m) return null;
   if (!warp && P.cache.has(name)) return P.cache.get(name);
   if (!P.colors) P.colors = P.palette.map(([r, g, b, l, role]) => { const c = new THREE.Color(`rgb(${r},${g},${b})`); return [c.r, c.g, c.b, l, role || 0]; });
-  const p = new Int16Array(P.buf, m.p, m.n * 3), c = new Uint16Array(P.buf, m.c, m.n), idx = new Uint16Array(P.buf, m.i, m.m);
+  // m.e : données préparées pour la compression (packs récents) ; sinon tableaux bruts (anciens packs)
+  const p = m.e ? asDecode16(P.buf, m.p, m.n * 3, 3, Int16Array) : new Int16Array(P.buf, m.p, m.n * 3);
+  const c = m.e ? asDecode16(P.buf, m.c, m.n, 1, Uint16Array) : new Uint16Array(P.buf, m.c, m.n);
+  const idx = m.e ? asDecode16(P.buf, m.i, m.m, 1, Uint16Array) : new Uint16Array(P.buf, m.i, m.m);
   const pos = new Float32Array(m.n * 3), col = new Float32Array(m.n * 3), lit = new Float32Array(m.n), role = new Float32Array(m.n);
   for (let v = 0; v < m.n; v++) {
     let x = p[v * 3] * m.s, y = p[v * 3 + 1] * m.s, z = p[v * 3 + 2] * m.s;

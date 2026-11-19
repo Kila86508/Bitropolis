@@ -16,3 +16,16 @@ test('noms de modèles masqués, stables pour un même sel', () => {
   assert.notEqual(obfName('Townhall_N8', 'a'), obfName('Townhall_N8', 'b'));
   assert.match(obfName('Townhall_N8', 'a'), /^[0-9a-f]{16}$/);
 });
+
+test('encodage des modèles : aller-retour exact (écarts + plans d\'octets)', async () => {
+  const { encode16 } = await import('../scripts/assets.js');
+  const { asDecode16 } = await import('../src/viewer/assets.js');
+  const P = new Int16Array(3000), I = new Uint16Array(4000);
+  for (let k = 0; k < P.length; k++) P[k] = ((k * 7919) % 65536) - 32768;
+  for (let k = 0; k < I.length; k++) I[k] = (k * 104729) % 65536;
+  for (const [src, stride, Ctor] of [[P, 3, Int16Array], [I, 1, Uint16Array]]) {
+    const enc = encode16(src, stride);
+    const buf = new ArrayBuffer(enc.length + 8); new Uint8Array(buf, 8).set(enc);
+    assert.deepEqual(asDecode16(buf, 8, src.length, stride, Ctor), src);
+  }
+});

@@ -290,7 +290,10 @@ export function layoutGrid(analysis) {
     let mask = 0;
     GD_DIRS.forEach(([dx, dz], i) => { if (isRoad(x + dx, z + dz)) mask |= 1 << i; });
     const t = GD_ROADS[mask] || GD_ROADS[3];
-    roadTiles.push({ x: wx(x), z: wz(z), cx: x, cz: z, model: `${t.shape}_N${Math.max(1, cellTier[z * cols + x] || 2)}`, rot: t.rot });
+    // ligne droite qui débouche sur un carrefour : passage piéton (kit de voirie)
+    const degree = (cx, cz) => GD_DIRS.reduce((n, [dx, dz]) => n + (isRoad(cx + dx, cz + dz) ? 1 : 0), 0);
+    const crossing = t.shape === 'Road_Straight' && GD_DIRS.some(([dx, dz], i) => (mask & (1 << i)) && degree(x + dx, z + dz) >= 3);
+    roadTiles.push({ x: wx(x), z: wz(z), cx: x, cz: z, model: `${t.shape}_N${Math.max(1, cellTier[z * cols + x] || 2)}`, rot: t.rot, crossing });
   }
 
   // 6) bâtiments (parcelles)

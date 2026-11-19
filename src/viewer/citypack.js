@@ -1,7 +1,7 @@
 // Bitropolis — affiche une ville en grille (src/core/grid.js) avec les modèles du pack de ville.
 // Sol, routes (8 niveaux), bâtiments à stades N1→N8, arbres et monuments : un InstancedMesh par modèle.
 import { CELL } from '../core/grid.js';
-import { TREES, GROUNDS, VARIANTS, chainOf, footprint, familyOf } from '../core/catalog.js';
+import { TREES, GROUNDS, VARIANTS, chainOf, footprint, familyOf, kitRoad } from '../core/catalog.js';
 import { packGeometry, packModel } from './assets.js';
 import { hashString } from '../core/rules.js';
 
@@ -210,7 +210,12 @@ export function buildPackCity(city, analysis, material, rng) {
     I.add(model, wx(x), GROUND_Y, wz(z), 0);
   }
   // --- routes
-  const roadRefs = city.roadTiles.map((t) => I.add(t.model, t.x, CITY_Y, t.z, (t.rot * Math.PI) / 2));
+  // tuiles du kit de voirie quand le pack les contient (sinon anciennes routes du pack)
+  const roadRefs = city.roadTiles.map((t) => {
+    const k = kitRoad(t.model, t.rot, t.crossing);
+    const use = k && packModel('city', k.model) ? k : t;
+    return I.add(use.model, t.x, CITY_Y, t.z, (use.rot * Math.PI) / 2);
+  });
 
   // --- bâtiments
   const buildings = new Array(analysis.files.length);
@@ -273,7 +278,7 @@ export function buildPackCity(city, analysis, material, rng) {
   for (const r of roadRefs) r.mesh = meshes.get(r.model);
   // état des feux par tuile (aSig), piloté par la simulation de trafic
   for (const [model, mesh] of meshes) {
-    if (!/^Road_(T|Cross)_N[5-8]$/.test(model)) continue;
+    if (!/^(Road_(T|Cross)_N[5-8]|(Route|Avenue)_(T|Croix))$/.test(model)) continue;
     mesh.geometry.setAttribute('aSig', new THREE.InstancedBufferAttribute(new Float32Array(mesh.count * 2), 2).setUsage(THREE.DynamicDrawUsage));
   }
   return { group, buildings, monuments, meshes, parts: parts.filter((pt) => pt.mesh), fx, roadRefs };

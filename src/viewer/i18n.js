@@ -64,7 +64,8 @@ I18N_D.en = {
   'f.coal': 'Coal plant', 'f.nuclear': 'Nuclear plant', 'f.water': 'Water tower', 'f.wastewater': 'Treatment plant', 'f.recycling': 'Recycling center',
   'f.park': 'Park', 'f.grove': 'Grove', 'f.garden': 'Garden', 'f.block': 'Residential block', 'f.theater': 'Theater', 'f.opera': 'Opera house',
   'f.research': 'Research center', 'f.prison': 'Prison', 'f.transit': 'Bus station', 'f.school': 'School', 'f.artisan': 'Craft zone',
-  'f.solarplant': 'Solar power plant', 'f.clocktower': 'Clock tower', 'f.fountain': 'Fountain', 'f.memorial': 'Memorial'
+  'f.solarplant': 'Solar power plant', 'f.clocktower': 'Clock tower', 'f.fountain': 'Fountain', 'f.memorial': 'Memorial',
+  'f.bank': 'Bank', 'f.powerplant': 'Power plant', 'f.cinema': 'Cinema', 'f.church': 'Church', 'f.station': 'Train station', 'f.hotel': 'Hotel', 'f.parking': 'Car park', 'f.restaurant': 'Restaurant', 'f.skyscraper': 'Skyscraper', 'f.steelworks': 'Steelworks', 'f.sawmill': 'Sawmill', 'f.chemical': 'Chemical plant', 'f.techfactory': 'Tech factory', 'f.textile': 'Textile mill'
 };
 
 I18N_D.fr = {
@@ -121,7 +122,8 @@ I18N_D.fr = {
   'f.coal': 'Centrale à charbon', 'f.nuclear': 'Centrale nucléaire', 'f.water': "Château d'eau", 'f.wastewater': "Station d'épuration", 'f.recycling': 'Centre de recyclage',
   'f.park': 'Parc', 'f.grove': 'Bosquet', 'f.garden': 'Jardin', 'f.block': 'Îlot résidentiel', 'f.theater': 'Théâtre', 'f.opera': 'Opéra',
   'f.research': 'Centre de recherche', 'f.prison': 'Prison', 'f.transit': 'Gare routière', 'f.school': 'École', 'f.artisan': 'Zone artisanale',
-  'f.solarplant': 'Centrale solaire', 'f.clocktower': "Tour de l'horloge", 'f.fountain': 'Fontaine', 'f.memorial': 'Mémorial'
+  'f.solarplant': 'Centrale solaire', 'f.clocktower': "Tour de l'horloge", 'f.fountain': 'Fontaine', 'f.memorial': 'Mémorial',
+  'f.bank': 'Banque', 'f.powerplant': 'Centrale électrique', 'f.cinema': 'Cinéma', 'f.church': 'Église', 'f.station': 'Gare', 'f.hotel': 'Hôtel', 'f.parking': 'Parking', 'f.restaurant': 'Restaurant', 'f.skyscraper': 'Gratte-ciel', 'f.steelworks': 'Aciérie', 'f.sawmill': 'Scierie', 'f.chemical': 'Usine chimique', 'f.techfactory': 'Usine high-tech', 'f.textile': 'Usine textile'
 };
 
 I18N_D.de = {
@@ -178,7 +180,8 @@ I18N_D.de = {
   'f.coal': 'Kohlekraftwerk', 'f.nuclear': 'Atomkraftwerk', 'f.water': 'Wasserturm', 'f.wastewater': 'Kläranlage', 'f.recycling': 'Recyclinghof',
   'f.park': 'Park', 'f.grove': 'Wäldchen', 'f.garden': 'Garten', 'f.block': 'Wohnblock', 'f.theater': 'Theater', 'f.opera': 'Oper',
   'f.research': 'Forschungszentrum', 'f.prison': 'Gefängnis', 'f.transit': 'Busbahnhof', 'f.school': 'Schule', 'f.artisan': 'Gewerbegebiet',
-  'f.solarplant': 'Solarkraftwerk', 'f.clocktower': 'Uhrturm', 'f.fountain': 'Brunnen', 'f.memorial': 'Denkmal'
+  'f.solarplant': 'Solarkraftwerk', 'f.clocktower': 'Uhrturm', 'f.fountain': 'Brunnen', 'f.memorial': 'Denkmal',
+  'f.bank': 'Bank', 'f.powerplant': 'Kraftwerk', 'f.cinema': 'Kino', 'f.church': 'Kirche', 'f.station': 'Bahnhof', 'f.hotel': 'Hotel', 'f.parking': 'Parkhaus', 'f.restaurant': 'Restaurant', 'f.skyscraper': 'Wolkenkratzer', 'f.steelworks': 'Stahlwerk', 'f.sawmill': 'Sägewerk', 'f.chemical': 'Chemiewerk', 'f.techfactory': 'Technikfabrik', 'f.textile': 'Textilfabrik'
 };
 
 I18N_D.it = {
@@ -235,7 +238,8 @@ I18N_D.it = {
   'f.coal': 'Centrale a carbone', 'f.nuclear': 'Centrale nucleare', 'f.water': 'Torre idrica', 'f.wastewater': 'Depuratore', 'f.recycling': 'Centro di riciclo',
   'f.park': 'Parco', 'f.grove': 'Boschetto', 'f.garden': 'Giardino', 'f.block': 'Isolato residenziale', 'f.theater': 'Teatro', 'f.opera': 'Teatro lirico',
   'f.research': 'Centro di ricerca', 'f.prison': 'Prigione', 'f.transit': 'Stazione degli autobus', 'f.school': 'Scuola', 'f.artisan': 'Zona artigianale',
-  'f.solarplant': 'Centrale solare', 'f.clocktower': "Torre dell'orologio", 'f.fountain': 'Fontana', 'f.memorial': 'Memoriale'
+  'f.solarplant': 'Centrale solare', 'f.clocktower': "Torre dell'orologio", 'f.fountain': 'Fontana', 'f.memorial': 'Memoriale',
+  'f.bank': 'Banca', 'f.powerplant': 'Centrale elettrica', 'f.cinema': 'Cinema', 'f.church': 'Chiesa', 'f.station': 'Stazione', 'f.hotel': 'Hotel', 'f.parking': 'Parcheggio', 'f.restaurant': 'Ristorante', 'f.skyscraper': 'Grattacielo', 'f.steelworks': 'Acciaieria', 'f.sawmill': 'Segheria', 'f.chemical': 'Impianto chimico', 'f.techfactory': 'Fabbrica high-tech', 'f.textile': 'Fabbrica tessile'
 };
 
 I18N_D.es = {
@@ -292,7 +296,8 @@ I18N_D.es = {
   'f.coal': 'Central de carbón', 'f.nuclear': 'Central nuclear', 'f.water': 'Depósito de agua', 'f.wastewater': 'Depuradora', 'f.recycling': 'Centro de reciclaje',
   'f.park': 'Parque', 'f.grove': 'Arboleda', 'f.garden': 'Jardín', 'f.block': 'Manzana residencial', 'f.theater': 'Teatro', 'f.opera': 'Ópera',
   'f.research': 'Centro de investigación', 'f.prison': 'Prisión', 'f.transit': 'Estación de autobuses', 'f.school': 'Escuela', 'f.artisan': 'Zona artesanal',
-  'f.solarplant': 'Central solar', 'f.clocktower': 'Torre del reloj', 'f.fountain': 'Fuente', 'f.memorial': 'Memorial'
+  'f.solarplant': 'Central solar', 'f.clocktower': 'Torre del reloj', 'f.fountain': 'Fuente', 'f.memorial': 'Memorial',
+  'f.bank': 'Banco', 'f.powerplant': 'Central eléctrica', 'f.cinema': 'Cine', 'f.church': 'Iglesia', 'f.station': 'Estación de tren', 'f.hotel': 'Hotel', 'f.parking': 'Aparcamiento', 'f.restaurant': 'Restaurante', 'f.skyscraper': 'Rascacielos', 'f.steelworks': 'Acería', 'f.sawmill': 'Aserradero', 'f.chemical': 'Planta química', 'f.techfactory': 'Fábrica tecnológica', 'f.textile': 'Fábrica textil'
 };
 
 I18N_D.zh = {
@@ -348,7 +353,8 @@ I18N_D.zh = {
   'f.coal': '燃煤电厂', 'f.nuclear': '核电站', 'f.water': '水塔', 'f.wastewater': '污水处理厂', 'f.recycling': '回收中心',
   'f.park': '公园', 'f.grove': '小树林', 'f.garden': '花园', 'f.block': '住宅街区', 'f.theater': '剧院', 'f.opera': '歌剧院',
   'f.research': '研究中心', 'f.prison': '监狱', 'f.transit': '公交站', 'f.school': '学校', 'f.artisan': '手工业区',
-  'f.solarplant': '太阳能电站', 'f.clocktower': '钟楼', 'f.fountain': '喷泉', 'f.memorial': '纪念馆'
+  'f.solarplant': '太阳能电站', 'f.clocktower': '钟楼', 'f.fountain': '喷泉', 'f.memorial': '纪念馆',
+  'f.bank': '银行', 'f.powerplant': '发电厂', 'f.cinema': '电影院', 'f.church': '教堂', 'f.station': '火车站', 'f.hotel': '酒店', 'f.parking': '停车场', 'f.restaurant': '餐厅', 'f.skyscraper': '摩天楼', 'f.steelworks': '钢铁厂', 'f.sawmill': '锯木厂', 'f.chemical': '化工厂', 'f.techfactory': '科技工厂', 'f.textile': '纺织厂'
 };
 
 I18N_D.ru = {
@@ -407,7 +413,8 @@ I18N_D.ru = {
   'f.coal': 'Угольная ТЭС', 'f.nuclear': 'АЭС', 'f.water': 'Водонапорная башня', 'f.wastewater': 'Очистные сооружения', 'f.recycling': 'Центр переработки',
   'f.park': 'Парк', 'f.grove': 'Роща', 'f.garden': 'Сад', 'f.block': 'Жилой квартал', 'f.theater': 'Театр', 'f.opera': 'Опера',
   'f.research': 'Исследовательский центр', 'f.prison': 'Тюрьма', 'f.transit': 'Автовокзал', 'f.school': 'Школа', 'f.artisan': 'Ремесленная зона',
-  'f.solarplant': 'Солнечная электростанция', 'f.clocktower': 'Часовая башня', 'f.fountain': 'Фонтан', 'f.memorial': 'Мемориал'
+  'f.solarplant': 'Солнечная электростанция', 'f.clocktower': 'Часовая башня', 'f.fountain': 'Фонтан', 'f.memorial': 'Мемориал',
+  'f.bank': 'Банк', 'f.powerplant': 'Электростанция', 'f.cinema': 'Кинотеатр', 'f.church': 'Церковь', 'f.station': 'Вокзал', 'f.hotel': 'Отель', 'f.parking': 'Парковка', 'f.restaurant': 'Ресторан', 'f.skyscraper': 'Небоскрёб', 'f.steelworks': 'Сталелитейный завод', 'f.sawmill': 'Лесопилка', 'f.chemical': 'Химический завод', 'f.techfactory': 'Высокотехнологичный завод', 'f.textile': 'Текстильная фабрика'
 };
 
 // Messages de la ligne de commande (npx bitropolis)
@@ -505,7 +512,11 @@ const I18N_FAMILY = {
   Coal: 'coal', Nuclear: 'nuclear', Water: 'water', Wastewater: 'wastewater', Recycling: 'recycling', Park: 'park',
   '@grove': 'grove', '@grove2': 'garden', Residential_Block: 'block', Theater: 'theater', Opera: 'opera', Research: 'research',
   Prison: 'prison', Transit: 'transit', School: 'school', Light_Industrial_Complex: 'artisan', Solar_Complex: 'solarplant',
-  ClockTower_L: 'clocktower', Fountain_L: 'fountain', Memorial_L: 'memorial'
+  ClockTower_L: 'clocktower', Fountain_L: 'fountain', Memorial_L: 'memorial',
+  Banque_L: 'bank', Centrale_L: 'powerplant', Cinema_L: 'cinema', Ecole_L: 'school', Eglise_L: 'church', Gare_L: 'station', Hotel_L: 'hotel',
+  ParkingA_L: 'parking', ParkingB_L: 'parking', ParkingC_L: 'parking', Police_L: 'police', Restaurant_L: 'restaurant',
+  Usine_Acier_L: 'steelworks', Usine_Bois_L: 'sawmill', Usine_Chimie_L: 'chemical', Usine_Tech_L: 'techfactory', Usine_Textile_L: 'textile',
+  TourAiguille_L: 'skyscraper', TourArche_L: 'skyscraper', TourBoucle_L: 'skyscraper', TourDeco_L: 'skyscraper', TourEclat_L: 'skyscraper', TourHyper_L: 'skyscraper', TourJumelles_L: 'skyscraper', TourOeuf_L: 'skyscraper', TourPagode_L: 'skyscraper', TourTorsade_L: 'skyscraper', TourTubes_L: 'skyscraper'
 };
 
 let i18nLang = 'en';

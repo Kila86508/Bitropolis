@@ -184,6 +184,16 @@ export function readGLB(file) {
   return { prims, parts, fx };
 }
 
+// Éclairage d'un matériau .obj : lentilles de feux (3–8, d'après l'axe de leur tête), lampes (2), fenêtres (1).
+const OBJ_LENS = /(^|_)fl_(red|green|yel)$/i;
+function objLit(key) {
+  const lens = /(?:^|_)fl_(red|green|yel)\|([XY])$/i.exec(key);
+  if (lens) return (lens[2] === 'X' ? 3 : 6) + { red: 0, green: 1, yel: 2 }[lens[1].toLowerCase()];
+  if (/light|lamp|bulb/i.test(key) && !/pole|post|base/i.test(key)) return 2;
+  if (/(^|_)win$|glass/i.test(key)) return 1;
+  return 0;
+}
+
 // --- Lecture d'un .obj (+ .mtl pour les couleurs « Kd ») : recentré au sol, mis à l'échelle de la grille.
 export function readOBJ(file, scale = 1) {
   const dir = path.dirname(file);
@@ -199,15 +209,22 @@ export function readOBJ(file, scale = 1) {
     }
   }
   const V = [];
-  const groups = new Map(); // matériau → triangles (indices globaux)
+  const groups = new Map(); // matériau (et axe pour les lentilles de feux) → triangles (indices globaux)
   let mat = '';
   for (const line of text.split(/\r?\n/)) {
     if (line.startsWith('v ')) { const t = line.trim().split(/\s+/); V.push(+t[1], +t[2], +t[3]); }
     else if (line.startsWith('usemtl')) mat = line.slice(6).trim();
     else if (line.startsWith('f ')) {
       const ids = line.trim().split(/\s+/).slice(1).map((t) => { const v = parseInt(t, 10); return v < 0 ? V.length / 3 + v : v - 1; });
-      if (!groups.has(mat)) groups.set(mat, []);
-      const g = groups.get(mat);
+      let key = mat;
+      // lentilles des feux du kit de voirie : les têtes en (±3, ±4) regardent l'axe x, celles en (±4, ±3) l'axe z
+      if (OBJ_LENS.test(mat)) {
+        let x = 0, z = 0;
+        for (const i of ids) { x += V[i * 3]; z += V[i * 3 + 2]; }
+        key = mat + (Math.abs(z) > Math.abs(x) ? '|X' : '|Y');
+      }
+      if (!groups.has(key)) groups.set(key, []);
+      const g = groups.get(key);
       for (let k = 1; k + 1 < ids.length; k++) g.push(ids[0], ids[k], ids[k + 1]);
     }
   }
@@ -222,10 +239,25 @@ export function readOBJ(file, scale = 1) {
       if (k === undefined) { k = pos.length / 3; map.set(v, k); pos.push((V[v * 3] - cx) * scale, (V[v * 3 + 1] - y0) * scale, (V[v * 3 + 2] - cz) * scale); }
       idx.push(k);
     }
-    const c = kd.get(m) || [0.7, 0.7, 0.7];
-    prims.push({ pos: Float64Array.from(pos), idx: Float64Array.from(idx), uv: null, image: null, factor: [c[0], c[1], c[2], 1], lit: /light|lamp|bulb/i.test(m) && !/pole|post|base/i.test(m) ? 2 : 0, material: m });
+    const name = m.replace(/\|[XY]$/, '');
+    const c = kd.get(name) || [0.7, 0.7, 0.7];
+    prims.push({ pos: Float64Array.from(pos), idx: Float64Array.from(idx), uv: null, image: null, factor: [c[0], c[1], c[2], 1], lit: objLit(m), material: name });
   }
   return { prims, parts: [], fx: [] };
+}
+
+// Prépare un tableau 16 bits pour la compression (sans perte) : composantes regroupées (x… y… z…),
+// écart avec la valeur précédente, puis octets faibles et octets forts en deux plans séparés.
+// Les modèles très détaillés se compressent ainsi bien mieux. Décodage : asDecode16 (src/viewer/assets.js).
+export function encode16(src, stride) {
+  const n = src.length, tmp = new Uint16Array(n), out = new Uint8Array(n * 2);
+  let o = 0;
+  for (let c = 0; c < stride; c++) {
+    let prev = 0;
+    for (let k = c; k < n; k += stride) { const v = src[k] & 0xffff; tmp[o++] = (v - prev) & 0xffff; prev = v; }
+  }
+  for (let i = 0; i < n; i++) { out[i] = tmp[i] & 255; out[n + i] = tmp[i] >> 8; }
+  return out;
 }
 
 // --- Un pack = plusieurs modèles partageant une palette, sérialisés dans un seul binaire gzip.
@@ -306,7 +338,7 @@ class PackWriter {
       for (const q of p.idx) I[i++] = base + q;
     }
     if (this.palette.length > 65535) throw new Error('Palette trop grande');
-    this.models[name] = { n: nv, m: ni, s, p: this.push(P), c: this.push(C), i: this.push(I), min: min.map((x) => +x.toFixed(4)), max: max.map((x) => +x.toFixed(4)) };
+    this.models[name] = { n: nv, m: ni, s, e: 1, p: this.push(encode16(P, 3)), c: this.push(encode16(C, 1)), i: this.push(encode16(I, 1)), min: min.map((x) => +x.toFixed(4)), max: max.map((x) => +x.toFixed(4)) };
     return true;
   }
   // Sérialise le pack : gzip puis brouillage (sel aléatoire par build), noms de modèles remplacés par des empreintes.
@@ -321,7 +353,7 @@ class PackWriter {
       if (copy.alts) copy.alts = copy.alts.map((a) => obfName(a, salt));
       models[obfName(name, salt)] = copy;
     }
-    return { v: 2, salt, palette: this.palette, models, data: Buffer.from(obfXor(gz, salt)).toString('base64') };
+    return { v: 3, salt, palette: this.palette, models, data: Buffer.from(obfXor(gz, salt)).toString('base64') };
   }
 }
 
@@ -350,7 +382,10 @@ export function packCity({ dir = CITY_PACK_DIR } = {}) {
     for (const f of fs.readdirSync(d)) if (f.endsWith('.glb')) index.set(f.slice(0, -4), path.join(d, f));
   }
   const missing = [];
+  // kit de voirie présent : les anciennes routes du pack ne servent plus (on ne les embarque pas)
+  const roadKit = fs.existsSync(path.join(NEW_MODELS_DIR, 'Route_Droite.obj'));
   for (const name of packModelNames()) {
+    if (roadKit && /^Road_/.test(name)) continue;
     if (!index.has(name)) {
       // nouvelles familles en .obj (Asset/export_obj)
       const obj = path.join(NEW_MODELS_DIR, name + '.obj');

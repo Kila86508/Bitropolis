@@ -16,12 +16,14 @@ const TF_GREEN = 7, TF_AMBER = 1.6, TF_CLEAR = 1.1, TF_CYCLE = 2 * (TF_GREEN + T
 
 export class TrafficSim {
   // city : plan en grille ; vehicles : Map(nom → InstancedMesh) ; roadRefs : instances des tuiles de route
-  constructor({ city, cell, cityY, rng, models, buildMeshes, roadRefs }) {
+  // halfWidths / roadTop : gabarits du kit de voirie s'il est utilisé (sinon ceux des routes du pack)
+  constructor({ city, cell, cityY, rng, models, buildMeshes, roadRefs, halfWidths = TF_HALF, roadTop = TF_ROAD_TOP }) {
+    this.half = halfWidths;
     this.city = city; this.cell = cell; this.cityY = cityY; this.rng = rng;
     this.cols = city.cols; this.rows = city.rows;
     this.time = 0;
     this.carScale = cell * 2.2;
-    this.y = cityY + TF_ROAD_TOP * cell - TF_CAR_BOTTOM * this.carScale;
+    this.y = cityY + roadTop * cell - TF_CAR_BOTTOM * this.carScale;
     const ox = city.origin[0], oz = city.origin[1];
     this.wx = (x) => ox + (x + 0.5) * cell;
     this.wz = (z) => oz + (z + 0.5) * cell;
@@ -97,7 +99,7 @@ export class TrafficSim {
   _slot(k, entry) { const key = k * 4 + entry; let s = this.slots.get(key); if (!s) { s = []; this.slots.set(key, s); } return s; }
   _next(k, d) { const x = k % this.cols, z = (k - x) / this.cols; return (z + TF_DIRS[d][1]) * this.cols + x + TF_DIRS[d][0]; }
   // décalage de voie (mètres) au passage entre deux cases : moyenne des deux chaussées
-  _lane(a, b) { return Math.max(0.32, (TF_HALF[this.tier[a] || 1] + TF_HALF[this.tier[b] || 1]) * 0.25 * this.cell); }
+  _lane(a, b) { return Math.max(0.32, (this.half[this.tier[a] || 1] + this.half[this.tier[b] || 1]) * 0.25 * this.cell); }
   // manœuvre au carrefour : 0 tout droit, 1 à droite, 2 à gauche, 3 demi-tour
   _turn(heading, out) {
     if (out === heading) return 0;

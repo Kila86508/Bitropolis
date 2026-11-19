@@ -5,8 +5,8 @@ import { getTheme } from './themes/index.js';
 import { CityControls } from './controls.js';
 import { buildLandscape, hasLandscapeAssets } from './landscape.js';
 import { layoutGrid, CELL } from '../core/grid.js';
-import { VEHICLES } from '../core/catalog.js';
-import { packReady } from './assets.js';
+import { VEHICLES, ROAD_KIT_HALF, ROAD_KIT_TOP } from '../core/catalog.js';
+import { packReady, packModel } from './assets.js';
 import { buildPackCity, buildPackVehicles, makePackMaterial, CITY_Y } from './citypack.js';
 import { TrafficSim } from './traffic.js';
 import { tp } from './i18n.js';
@@ -553,6 +553,7 @@ export class CityRenderer {
       // ville du pack : vraie circulation (voies, distances, feux, priorité à droite)
       this.traffic = new TrafficSim({
         city, cell: CELL, cityY: CITY_Y, rng: makeRng('traffic:' + this.analysis.name), models: VEHICLES, roadRefs: this.roadRefs,
+        ...(packModel('city', 'Route_Droite') ? { halfWidths: ROAD_KIT_HALF, roadTop: ROAD_KIT_TOP } : {}),
         buildMeshes: (names, counts) => buildPackVehicles(names, counts, this._packMat)
       });
       this.cars = this.traffic.cars;
