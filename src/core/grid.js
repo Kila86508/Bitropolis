@@ -136,11 +136,27 @@ const GD_ROADS = (() => {
   return t;
 })();
 
+// Gros projets : un sous-dossier de moins de `min` fichiers rejoint le quartier de son parent.
+// Sinon des milliers de quartiers d'un ou deux bâtiments, chacun entouré de routes, laissent la ville à moitié vide.
+function gdFoldSmallDirs(root, min) {
+  if (min < 2) return;
+  const all = (n, acc = []) => { acc.push(...n.files); for (const c of n.dirs.values()) all(c, acc); return acc; };
+  const fold = (n) => {
+    for (const [k, c] of [...n.dirs]) {
+      fold(c);
+      const sub = all(c);
+      if (sub.length < min) { n.files.push(...sub); n.dirs.delete(k); }
+    }
+  };
+  fold(root);
+}
+
 export function layoutGrid(analysis) {
   const files = analysis.files;
   const rng = makeRng('grid:' + analysis.name + ':' + files.length);
   const growth = files.map((f) => growthOf(f));
   const root = buildTree(files);
+  gdFoldSmallDirs(root, Math.floor(files.length / 400));
   const topIndex = new Map();
   const districtOf = (path) => {
     if (!path) return -1;

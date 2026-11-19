@@ -1,6 +1,6 @@
 // Bitropolis — analyse d'un projet : métriques, dépendances, importance, type de bâtiment.
 // Entrée : [{ path, size, content|null }]. Sortie : modèle sans aucun code source.
-import { baseName, dirName, extOf, stripExt, langOf, ASSET_EXT, CODE_EXT, MAX_FILES } from './rules.js';
+import { baseName, dirName, extOf, stripExt, langOf, ASSET_EXT, CODE_EXT, MAX_FILES, selectFiles } from './rules.js';
 
 export const KINDS = {
   townhall: { label: 'Hôtel de ville', role: "Point d'entrée principal du projet", icon: '🏛️' },
@@ -34,6 +34,7 @@ const RX = {
   rsUse: /\buse[ \t]+(crate|super|self)::([\w:]+)/g,
   jvImport: /^[ \t]*import[ \t]+(?:static[ \t]+)?([\w.]+)/gm,
   cInclude: /#[ \t]*include[ \t]*"([^"]+)"/g,
+  cIncludeSys: /#[ \t]*include[ \t]*<([^>\n]+)>/g,
   cssImport: /@(?:import|use|forward)\s+(?:url\()?\s*['"]?([^'")\s;]+)/g,
   phpReq: /\b(?:require|include)(?:_once)?\s*\(?\s*['"]([^'"]+)['"]/g,
   phpUse: /^[ \t]*use[ \t]+([\w\\]+)/gm,
@@ -91,6 +92,7 @@ function extractImports(path, ext, text) {
       break;
     case 'c': case 'h': case 'cpp': case 'cc': case 'cxx': case 'hpp': case 'hh': case 'm': case 'mm':
       for (const s of allMatches(RX.cInclude, text)) add(s, 'rel');
+      for (const s of allMatches(RX.cIncludeSys, text)) add(s, 'cinc');
       break;
     case 'css': case 'scss': case 'sass': case 'less': case 'styl':
       for (const s of allMatches(RX.cssImport, text)) if (!/^(https?:|\/\/|data:)/.test(s)) add(s, s.startsWith('.') ? 'rel' : 'relish');
@@ -197,6 +199,22 @@ function resolveSpec(f, spec, idx, files) {
       if (id < 0 && (f.ext === 'c' || f.ext === 'h' || f.ext === 'cpp' || f.ext === 'hpp' || f.ext === 'cc')) id = trySuffix(clean);
       return id;
     }
+    case 'cinc': {
+      // #include <linux/sched.h> : à côté du fichier, sinon dans un dossier include/ du projet
+      // (include/, arch/x86/include/, include/uapi/…). <stdio.h> sans équivalent dans le projet reste externe.
+      const p = normPath(clean);
+      const near = tryExact(joinPath(f.dir, p));
+      if (near >= 0) return near;
+      const cands = idx.suffix.get(stripExt(p));
+      if (!cands) return -1;
+      const ok = cands.filter((c) => {
+        const fp = files[c].path;
+        if (!fp.endsWith(p)) return false;
+        const pre = fp.slice(0, fp.length - p.length);
+        return pre === '' || /(^|\/)include\/(uapi\/|generated\/)?$/.test(pre);
+      });
+      return pickClosest(ok, f, files);
+    }
     case 'alias': {
       let id = tryExact(normPath(clean));
       if (id < 0) id = tryExact('src/' + normPath(clean));
@@ -290,13 +308,12 @@ export function analyzeProject(rawFiles, options = {}) {
     .filter((f) => f.path);
   list.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 
-  let truncated = 0;
+  // options.skipped : fichiers déjà écartés par le scan (gros projets, voir selectFiles)
+  let truncated = options.skipped || 0;
   if (list.length > MAX_FILES) {
-    // On garde en priorité le code puis les plus gros fichiers.
-    const rank = (f) => (CODE_EXT.has(extOf(f.path)) ? 1e12 : 0) + (f.content ? f.content.length : f.size / 50);
-    const kept = new Set(list.slice().sort((a, b) => rank(b) - rank(a)).slice(0, MAX_FILES));
-    truncated = list.length - MAX_FILES;
-    list = list.filter((f) => kept.has(f));
+    const before = list.length;
+    list = selectFiles(list);
+    truncated += before - list.length;
   }
 
   const files = list.map((raw, id) => {

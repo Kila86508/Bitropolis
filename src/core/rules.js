@@ -79,6 +79,59 @@ export function isBinaryPath(p) { return BINARY_EXT.has(extOf(p)); }
 export function shouldReadContent(p, size) {
   return !isBinaryPath(p) && !NO_READ_FILES.has(baseName(p)) && size <= MAX_TEXT_SIZE;
 }
+// Gros projets : on choisit MAX_FILES fichiers représentatifs AVANT de les lire (seule la taille est connue).
+// 1) Chaque dossier de premier niveau reçoit une part proportionnelle à la racine carrée de sa taille :
+//    un énorme dossier (drivers/) reste le plus grand quartier sans écraser les autres (kernel/, mm/…).
+// 2) Dans chaque part : le code d'abord, puis les gros fichiers ; les en-têtes des dossiers include/ (très
+//    importés) sont favorisés, et chaque fichier de plus dans un même dossier compte un peu moins.
+export const SCAN_LIMIT = 300000; // nombre maximum de fichiers parcourus (lecture des noms et tailles seulement)
+function scanScore(e, k) {
+  const ext = extOf(e.path);
+  const hub = (ext === 'h' || ext === 'hh' || ext === 'hpp') && /(^|\/)include\//.test(e.path);
+  return (CODE_EXT.has(ext) ? 8 : 0) + (hub ? 3 : 0) + Math.log2(1 + e.size) - 2 * Math.log2(1 + k);
+}
+export function selectFiles(entries, max = MAX_FILES) {
+  if (entries.length <= max) return entries;
+  // score de chaque fichier (rang dans son dossier)
+  const byDir = new Map();
+  for (const e of entries) {
+    const d = dirName(e.path);
+    if (!byDir.has(d)) byDir.set(d, []);
+    byDir.get(d).push(e);
+  }
+  const score = new Map();
+  for (const group of byDir.values()) {
+    group.sort((x, y) => y.size - x.size);
+    group.forEach((e, k) => score.set(e, scanScore(e, k)));
+  }
+  // parts par dossier de premier niveau
+  const tops = new Map();
+  for (const e of entries) {
+    const i = e.path.indexOf('/');
+    const top = i < 0 ? '' : e.path.slice(0, i);
+    if (!tops.has(top)) tops.set(top, { list: [], w: 0 });
+    const g = tops.get(top);
+    g.list.push(e);
+    g.w += CODE_EXT.has(extOf(e.path)) ? 1 : 0.1;
+  }
+  const groups = [...tops.values()];
+  for (const g of groups) { g.w = Math.sqrt(g.w); g.quota = 0; g.list.sort((x, y) => score.get(y) - score.get(x)); }
+  let left = max, open = groups.filter((g) => g.list.length);
+  while (left > 0 && open.length) {
+    const W = open.reduce((t, g) => t + g.w, 0);
+    let given = 0;
+    for (const g of open) {
+      const q = Math.min(g.list.length - g.quota, Math.max(1, Math.floor((left * g.w) / W)));
+      g.quota += q; given += q;
+      if (given >= left) break;
+    }
+    left -= given;
+    open = open.filter((g) => g.quota < g.list.length);
+  }
+  const keep = new Set();
+  for (const g of groups) for (let i = 0; i < g.quota; i++) keep.add(g.list[i]);
+  return entries.filter((e) => keep.has(e));
+}
 export function shouldSkipDir(name) {
   if (IGNORED_DIRS.has(name)) return true;
   if (name.startsWith('.') && !KEPT_DOT_DIRS.has(name)) return true;

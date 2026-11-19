@@ -1,6 +1,6 @@
 // Bitropolis — interface : panneaux, recherche, légende, ouverture de dossier locale.
 import { KINDS, analyzeProject } from '../core/analyze.js';
-import { shouldSkipDir, shouldSkipFile, shouldReadContent, makeIgnoreMatcher, MAX_FILES } from '../core/rules.js';
+import { shouldSkipDir, shouldSkipFile, shouldReadContent, makeIgnoreMatcher, selectFiles, SCAN_LIMIT } from '../core/rules.js';
 import { UPCOMING_THEMES, availableThemes, defaultThemeId } from './themes/index.js';
 import { hasLandscapeAssets } from './landscape.js';
 import { assetsReady } from './assets.js';
@@ -31,10 +31,12 @@ async function uiReadFiles(entries, rootName, onProgress) {
       if (shouldSkipDir(segs[i]) || ignored(segs.slice(0, i + 1).join('/'), true)) return false;
     }
     return !shouldSkipFile(segs[segs.length - 1]) && !ignored(e.path, false);
-  }).slice(0, MAX_FILES * 3);
+  });
+  // gros projets : on choisit les fichiers représentatifs avant de les lire (voir selectFiles)
+  const chosen = selectFiles(kept.map((e) => ({ path: e.path, size: e.file.size, file: e.file })));
   const out = [];
   let i = 0;
-  for (const e of kept) {
+  for (const e of chosen) {
     let content = null;
     if (shouldReadContent(e.path, e.file.size)) {
       try {
@@ -43,9 +45,9 @@ async function uiReadFiles(entries, rootName, onProgress) {
       } catch {}
     }
     out.push({ path: e.path, size: e.file.size, content });
-    if (++i % 100 === 0) { onProgress && onProgress(i, kept.length); await new Promise((r) => setTimeout(r)); }
+    if (++i % 100 === 0) { onProgress && onProgress(i, chosen.length); await new Promise((r) => setTimeout(r)); }
   }
-  return analyzeProject(out, { name: rootName });
+  return analyzeProject(out, { name: rootName, skipped: kept.length - chosen.length });
 }
 
 function uiFromFileList(list) {
@@ -68,7 +70,7 @@ async function uiFromDrop(items) {
     next();
   });
   const walk = async (entry, prefix) => {
-    if (entries.length > MAX_FILES * 3) return;
+    if (entries.length > SCAN_LIMIT) return;
     if (entry.isFile) {
       const file = await new Promise((res, rej) => entry.file(res, rej)).catch(() => null);
       if (file) entries.push({ path: prefix + entry.name, file });

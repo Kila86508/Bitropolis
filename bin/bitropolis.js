@@ -84,10 +84,10 @@ async function main() {
   console.log('\n🏗️  ' + t('cli.building', { name }));
 
   const t0 = Date.now();
-  const raw = scanDirectory(dir, { onProgress: (n) => process.stdout.isTTY && process.stdout.write('\r   📂 ' + t('cli.reading', { n })) });
+  const raw = await scanDirectory(dir, { onProgress: (n) => process.stdout.isTTY && process.stdout.write('\r   📂 ' + t('cli.reading', { n })) });
   if (process.stdout.isTTY) process.stdout.write('\r' + ' '.repeat(40) + '\r');
   if (!raw.length) { console.error('❌ ' + t('cli.nofiles')); process.exit(1); }
-  const analysis = analyzeProject(raw, { name });
+  const analysis = analyzeProject(raw, { name, skipped: raw.skipped });
   const s = analysis.stats;
 
   // Ville précédente au même endroit : on garde le stade de chaque bâtiment pour animer ce qui a grandi.

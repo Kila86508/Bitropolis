@@ -695,7 +695,8 @@ export class CityRenderer {
         const b = this.buildings[f.id];
         if (b && f.path.startsWith(d.path + '/')) maxH = Math.max(maxH, b.box.max.y);
       }
-      const size = Math.min(14, Math.max(4.5, Math.sqrt(d.w * d.d) * 0.22));
+      // plafond proportionnel à la ville : sur un très gros projet, les grands quartiers restent lisibles de loin
+      const size = Math.min(Math.max(14, (city.size || 0) * 0.07), Math.max(4.5, Math.sqrt(d.w * d.d) * 0.22));
       sp.scale.set(size * sp.userData.aspect * 0.5, size * 0.5, 1);
       sp.position.set(d.x + d.w / 2, maxH + 3 + size * 0.3, d.z + d.d / 2);
       this.labels.add(sp);

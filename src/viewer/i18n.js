@@ -418,7 +418,7 @@ Object.assign(I18N_D.en, {
   'cli.o.lang': 'Language: en, fr, de, it, es, zh, ru', 'cli.o.version': 'Version', 'cli.o.help': 'Help',
   'cli.ex.cwd': "the current folder's city", 'cli.arg.dir': 'folder', 'cli.arg.file': 'file', 'cli.arg.name': 'name',
   'cli.unknown': 'Unknown option: {a}', 'cli.notfound': 'Folder not found: {dir}', 'cli.building': 'Bitropolis — building “{name}”',
-  'cli.reading': '{n} files read…', 'cli.nofiles': 'No usable files in this folder.',
+  'cli.reading': '{n} files found…', 'cli.nofiles': 'No usable files in this folder.',
   'cli.summary': '{files} buildings · 📝 {loc} lines · 🔗 {edges} links', 'cli.truncated': '{n} minor files skipped (huge project)',
   'cli.ready': 'City ready in {s} s → {out}', 'cli.local': '100% local: no source code is copied, nothing is sent.',
   'cli.openit': 'Open this file in your browser: {url}'
@@ -430,7 +430,7 @@ Object.assign(I18N_D.fr, {
   'cli.o.lang': 'Langue : en, fr, de, it, es, zh, ru', 'cli.o.version': 'Version', 'cli.o.help': 'Aide',
   'cli.ex.cwd': 'la ville du dossier courant', 'cli.arg.dir': 'dossier', 'cli.arg.file': 'fichier', 'cli.arg.name': 'nom',
   'cli.unknown': 'Option inconnue : {a}', 'cli.notfound': 'Dossier introuvable : {dir}', 'cli.building': 'Bitropolis — construction de « {name} »',
-  'cli.reading': '{n} fichiers lus…', 'cli.nofiles': 'Aucun fichier exploitable dans ce dossier.',
+  'cli.reading': '{n} fichiers trouvés…', 'cli.nofiles': 'Aucun fichier exploitable dans ce dossier.',
   'cli.summary': '{files} bâtiments · 📝 {loc} lignes · 🔗 {edges} liaisons', 'cli.truncated': '{n} fichiers mineurs ignorés (projet géant)',
   'cli.ready': 'Ville prête en {s} s → {out}', 'cli.local': "100 % local : aucun code source n'est copié, rien n'est envoyé.",
   'cli.openit': 'Ouvre ce fichier dans ton navigateur : {url}'
@@ -442,7 +442,7 @@ Object.assign(I18N_D.de, {
   'cli.o.lang': 'Sprache: en, fr, de, it, es, zh, ru', 'cli.o.version': 'Version', 'cli.o.help': 'Hilfe',
   'cli.ex.cwd': 'die Stadt des aktuellen Ordners', 'cli.arg.dir': 'ordner', 'cli.arg.file': 'datei', 'cli.arg.name': 'name',
   'cli.unknown': 'Unbekannte Option: {a}', 'cli.notfound': 'Ordner nicht gefunden: {dir}', 'cli.building': 'Bitropolis — „{name}“ wird gebaut',
-  'cli.reading': '{n} Dateien gelesen…', 'cli.nofiles': 'Keine verwertbaren Dateien in diesem Ordner.',
+  'cli.reading': '{n} Dateien gefunden…', 'cli.nofiles': 'Keine verwertbaren Dateien in diesem Ordner.',
   'cli.summary': '{files} Gebäude · 📝 {loc} Zeilen · 🔗 {edges} Verknüpfungen', 'cli.truncated': '{n} unwichtige Dateien übersprungen (riesiges Projekt)',
   'cli.ready': 'Stadt fertig in {s} s → {out}', 'cli.local': '100 % lokal: Kein Quellcode wird kopiert, nichts wird gesendet.',
   'cli.openit': 'Öffne diese Datei in deinem Browser: {url}'
@@ -454,7 +454,7 @@ Object.assign(I18N_D.it, {
   'cli.o.lang': 'Lingua: en, fr, de, it, es, zh, ru', 'cli.o.version': 'Versione', 'cli.o.help': 'Aiuto',
   'cli.ex.cwd': 'la città della cartella corrente', 'cli.arg.dir': 'cartella', 'cli.arg.file': 'file', 'cli.arg.name': 'nome',
   'cli.unknown': 'Opzione sconosciuta: {a}', 'cli.notfound': 'Cartella non trovata: {dir}', 'cli.building': 'Bitropolis — costruzione di «{name}»',
-  'cli.reading': '{n} file letti…', 'cli.nofiles': 'Nessun file utilizzabile in questa cartella.',
+  'cli.reading': '{n} file trovati…', 'cli.nofiles': 'Nessun file utilizzabile in questa cartella.',
   'cli.summary': '{files} edifici · 📝 {loc} righe · 🔗 {edges} collegamenti', 'cli.truncated': '{n} file minori ignorati (progetto enorme)',
   'cli.ready': 'Città pronta in {s} s → {out}', 'cli.local': '100% locale: nessun codice sorgente viene copiato, nulla viene inviato.',
   'cli.openit': 'Apri questo file nel browser: {url}'
@@ -466,7 +466,7 @@ Object.assign(I18N_D.es, {
   'cli.o.lang': 'Idioma: en, fr, de, it, es, zh, ru', 'cli.o.version': 'Versión', 'cli.o.help': 'Ayuda',
   'cli.ex.cwd': 'la ciudad de la carpeta actual', 'cli.arg.dir': 'carpeta', 'cli.arg.file': 'archivo', 'cli.arg.name': 'nombre',
   'cli.unknown': 'Opción desconocida: {a}', 'cli.notfound': 'Carpeta no encontrada: {dir}', 'cli.building': 'Bitropolis — construyendo «{name}»',
-  'cli.reading': '{n} archivos leídos…', 'cli.nofiles': 'No hay archivos utilizables en esta carpeta.',
+  'cli.reading': '{n} archivos encontrados…', 'cli.nofiles': 'No hay archivos utilizables en esta carpeta.',
   'cli.summary': '{files} edificios · 📝 {loc} líneas · 🔗 {edges} enlaces', 'cli.truncated': '{n} archivos menores omitidos (proyecto enorme)',
   'cli.ready': 'Ciudad lista en {s} s → {out}', 'cli.local': '100 % local: no se copia código fuente, no se envía nada.',
   'cli.openit': 'Abre este archivo en tu navegador: {url}'
@@ -478,7 +478,7 @@ Object.assign(I18N_D.zh, {
   'cli.o.lang': '语言：en, fr, de, it, es, zh, ru', 'cli.o.version': '版本', 'cli.o.help': '帮助',
   'cli.ex.cwd': '当前文件夹的城市', 'cli.arg.dir': '文件夹', 'cli.arg.file': '文件', 'cli.arg.name': '名称',
   'cli.unknown': '未知选项：{a}', 'cli.notfound': '找不到文件夹：{dir}', 'cli.building': 'Bitropolis — 正在建造“{name}”',
-  'cli.reading': '已读取 {n} 个文件…', 'cli.nofiles': '此文件夹中没有可用的文件。',
+  'cli.reading': '已找到 {n} 个文件…', 'cli.nofiles': '此文件夹中没有可用的文件。',
   'cli.summary': '{files} 栋建筑 · 📝 {loc} 行 · 🔗 {edges} 条依赖', 'cli.truncated': '已跳过 {n} 个次要文件（超大项目）',
   'cli.ready': '城市已在 {s} 秒内建好 → {out}', 'cli.local': '100% 本地：不复制任何源代码，不发送任何内容。',
   'cli.openit': '请在浏览器中打开此文件：{url}'
@@ -490,7 +490,7 @@ Object.assign(I18N_D.ru, {
   'cli.o.lang': 'Язык: en, fr, de, it, es, zh, ru', 'cli.o.version': 'Версия', 'cli.o.help': 'Справка',
   'cli.ex.cwd': 'город текущей папки', 'cli.arg.dir': 'папка', 'cli.arg.file': 'файл', 'cli.arg.name': 'имя',
   'cli.unknown': 'Неизвестный параметр: {a}', 'cli.notfound': 'Папка не найдена: {dir}', 'cli.building': 'Bitropolis — строим «{name}»',
-  'cli.reading': 'Прочитано файлов: {n}…', 'cli.nofiles': 'В этой папке нет подходящих файлов.',
+  'cli.reading': 'Найдено файлов: {n}…', 'cli.nofiles': 'В этой папке нет подходящих файлов.',
   'cli.summary': 'зданий: {files} · 📝 строк: {loc} · 🔗 связей: {edges}', 'cli.truncated': 'Пропущено второстепенных файлов: {n} (огромный проект)',
   'cli.ready': 'Город готов за {s} с → {out}', 'cli.local': '100 % локально: исходный код не копируется, ничего не отправляется.',
   'cli.openit': 'Открой этот файл в браузере: {url}'
