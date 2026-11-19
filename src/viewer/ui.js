@@ -1,5 +1,5 @@
 // Bitropolis — interface : panneaux, recherche, légende, ouverture de dossier locale.
-import { KINDS, analyzeProject } from '../core/analyze.js';
+import { KINDS, analyzeProjectAsync } from '../core/analyze.js';
 import { shouldSkipDir, shouldSkipFile, shouldReadContent, makeIgnoreMatcher, selectFiles, SCAN_LIMIT } from '../core/rules.js';
 import { UPCOMING_THEMES, availableThemes, defaultThemeId } from './themes/index.js';
 import { hasLandscapeAssets } from './landscape.js';
@@ -21,17 +21,33 @@ function uiSaveSnap(name, snap) { try { localStorage.setItem('bitropolis.snap:' 
 function uiTierName(f) { return f.kind === 'tower' ? t('tier.tower')[f.tier - 1] : t('tier.level', { n: f.tier }); }
 
 // ---- Lecture locale d'un dossier dans le navigateur (aucun envoi réseau)
+// Rend la main au navigateur (barre de progression, page réactive)
+const uiYield = () => new Promise((r) => setTimeout(r, 0));
+
 async function uiReadFiles(entries, rootName, onProgress) {
-  // entries : [{ path, file }]
+  // entries : [{ path, file }] ; onProgress(clé de texte, variables, fraction 0–1)
   const gi = entries.find((e) => e.path === '.gitignore');
   const ignored = makeIgnoreMatcher(gi ? await gi.file.text() : '');
-  const kept = entries.filter((e) => {
-    const segs = e.path.split('/');
-    for (let i = 0; i < segs.length - 1; i++) {
-      if (shouldSkipDir(segs[i]) || ignored(segs.slice(0, i + 1).join('/'), true)) return false;
+  // tri des fichiers (.gitignore, dossiers ignorés) : la décision de chaque dossier est mémorisée,
+  // et on rend la main régulièrement (près de 100 000 fichiers pour le noyau Linux)
+  const dirOk = new Map();
+  const okDir = (dir) => {
+    if (!dir) return true;
+    let v = dirOk.get(dir);
+    if (v === undefined) {
+      const i = dir.lastIndexOf('/');
+      v = okDir(i < 0 ? '' : dir.slice(0, i)) && !shouldSkipDir(dir.slice(i + 1)) && !ignored(dir, true);
+      dirOk.set(dir, v);
     }
-    return !shouldSkipFile(segs[segs.length - 1]) && !ignored(e.path, false);
-  });
+    return v;
+  };
+  const kept = [];
+  let t0 = performance.now();
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i], j = e.path.lastIndexOf('/');
+    if (okDir(j < 0 ? '' : e.path.slice(0, j)) && !shouldSkipFile(e.path.slice(j + 1)) && !ignored(e.path, false)) kept.push(e);
+    if (performance.now() - t0 > 40) { onProgress('load.filter', { i: uiNum(i), n: uiNum(entries.length) }, 0.05 + 0.1 * (i / entries.length)); await uiYield(); t0 = performance.now(); }
+  }
   // gros projets : on choisit les fichiers représentatifs avant de les lire (voir selectFiles)
   const chosen = selectFiles(kept.map((e) => ({ path: e.path, size: e.file.size, file: e.file })));
   const out = [];
@@ -45,9 +61,13 @@ async function uiReadFiles(entries, rootName, onProgress) {
       } catch {}
     }
     out.push({ path: e.path, size: e.file.size, content });
-    if (++i % 100 === 0) { onProgress && onProgress(i, chosen.length); await new Promise((r) => setTimeout(r)); }
+    if (++i % 50 === 0) { onProgress('load.read', { i: uiNum(i), n: uiNum(chosen.length) }, 0.15 + 0.45 * (i / chosen.length)); await uiYield(); }
   }
-  return analyzeProject(out, { name: rootName, skipped: kept.length - chosen.length });
+  return analyzeProjectAsync(out, { name: rootName, skipped: kept.length - chosen.length }, (p) => {
+    const f = p.n ? p.i / p.n : 0;
+    if (p.step === 'metrics') onProgress('load.metrics', { i: uiNum(p.i), n: uiNum(p.n) }, 0.6 + 0.25 * f);
+    else onProgress('load.links', { i: uiNum(p.i), n: uiNum(p.n) }, 0.85 + 0.08 * f);
+  });
 }
 
 function uiFromFileList(list) {
@@ -60,7 +80,7 @@ function uiFromFileList(list) {
   };
 }
 
-async function uiFromDrop(items) {
+async function uiFromDrop(items, onCount) {
   const entries = [];
   let root = 'projet';
   const roots = [...items].map((it) => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
@@ -69,24 +89,25 @@ async function uiFromDrop(items) {
     const next = () => reader.readEntries((batch) => { if (!batch.length) res(acc); else { acc.push(...batch); next(); } }, () => res(acc));
     next();
   });
-  const walk = async (entry, prefix) => {
+  let last = 0;
+  const fileOf = (entry) => new Promise((res, rej) => entry.file(res, rej)).catch(() => null);
+  // les fichiers d'un même dossier sont demandés en parallèle (beaucoup plus rapide sur un gros projet)
+  const walkDir = async (children, prefix) => {
     if (entries.length > SCAN_LIMIT) return;
-    if (entry.isFile) {
-      const file = await new Promise((res, rej) => entry.file(res, rej)).catch(() => null);
-      if (file) entries.push({ path: prefix + entry.name, file });
-    } else if (entry.isDirectory) {
-      if (prefix && shouldSkipDir(entry.name)) return;
-      for (const child of await readAll(entry.createReader())) await walk(child, prefix + (prefix || roots.length > 1 ? '' : '') + entry.name + '/');
+    const files = children.filter((c) => c.isFile);
+    const got = await Promise.all(files.map(fileOf));
+    got.forEach((file, i) => { if (file) entries.push({ path: prefix + files[i].name, file }); });
+    if (onCount && entries.length - last >= 500) { last = entries.length; onCount(entries.length); }
+    for (const d of children) {
+      if (!d.isDirectory || shouldSkipDir(d.name)) continue;
+      await walkDir(await readAll(d.createReader()), prefix + d.name + '/');
     }
   };
   if (roots.length === 1 && roots[0].isDirectory) {
     root = roots[0].name;
-    for (const child of await readAll(roots[0].createReader())) {
-      if (child.isDirectory && shouldSkipDir(child.name)) continue;
-      await walk(child, '');
-    }
+    await walkDir(await readAll(roots[0].createReader()), '');
   } else {
-    for (const r of roots) await walk(r, '');
+    await walkDir(roots, '');
   }
   return { root, entries };
 }
@@ -172,8 +193,9 @@ export class CityUI {
     window.addEventListener('drop', async (ev) => {
       ev.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
       if (!ev.dataTransfer?.items?.length) return;
-      const { root, entries } = await uiFromDrop(ev.dataTransfer.items);
-      if (entries.length) this._ingest(root, entries);
+      this._loading(t('load.list', { n: 0 }), null);
+      const { root, entries } = await uiFromDrop(ev.dataTransfer.items, (n) => this._loading(t('load.list', { n: uiNum(n) }), null));
+      if (entries.length) this._ingest(root, entries); else this._loading(null);
     });
 
     // survol / clic
@@ -235,9 +257,10 @@ export class CityUI {
   }
 
   async _ingest(root, entries) {
-    this._loading(t('load.analyze', { name: root }));
+    this._loading(t('load.analyze', { name: root }), 0.03);
+    await uiYield();
     try {
-      const analysis = await uiReadFiles(entries, root, (i, n) => this._loading(t('load.read', { i, n })));
+      const analysis = await uiReadFiles(entries, root, (key, vars, frac) => this._loading(t(key, vars), frac));
       if (!analysis.files.length) { this._loading(null); this.toast(t('toast.nofiles')); return; }
       this.load(analysis);
     } catch (err) {
@@ -247,14 +270,18 @@ export class CityUI {
     }
   }
 
-  _loading(text) {
+  // Écran de chargement : texte et barre (frac 0–1 ; null = progression inconnue, barre animée)
+  _loading(text, frac = null) {
     const el = $('#loading');
     if (!text) { el.hidden = true; return; }
     el.hidden = false; el.querySelector('span').textContent = text;
+    const bar = el.querySelector('.bar');
+    bar.classList.toggle('indeterminate', frac == null);
+    if (frac != null) bar.querySelector('em').style.width = `${Math.round(Math.min(1, Math.max(0, frac)) * 100)}%`;
   }
 
   load(analysis) {
-    this._loading(t('load.build'));
+    this._loading(t('load.build'), 0.95);
     setTimeout(async () => {
       try {
         await assetsReady();

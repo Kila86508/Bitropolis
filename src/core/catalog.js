@@ -146,13 +146,14 @@ export const TREES = ['Tree_Dark', 'Tree_Fresh', 'Tree_Light', 'Tree_Lime', 'Tre
 export const GROUNDS = ['Ground_Urban_A', 'Ground_Urban_B', 'Ground_Locked_A', 'Ground_Locked_B'];
 // Accessoires urbains (dossier « obj free city pack ») : nom → échelle (unités du .obj → cases de la grille)
 export const PROPS = {
-  bench2: 0.05, fireHydrant: 0.05, garbageBin: 0.045, trashBag1: 0.045, trashBag2: 0.045, trafficCone: 0.045,
-  streetLight: 0.045, tree2: 0.1, tree6: 0.1, garden1: 0.07, redCar: 0.065
+  // (poubelle, bouche d'incendie et voiture rouge retirées : plusieurs milliers de triangles chacune)
+  bench2: 0.05, trashBag1: 0.045, trashBag2: 0.045, trafficCone: 0.045,
+  streetLight: 0.045, tree2: 0.1, tree6: 0.1, garden1: 0.07
 };
 // Accessoires du kit de routes (Asset/Maison/road) : nom → échelle (mètres du kit → cases du pack,
 // réduite pour s'accorder aux proportions « maquette » du pack)
 export const KIT_PROPS = {
-  lamp_1: 0.065, lamp_2: 0.065, hazzard_cone_1: 0.13, traffic_barell_1: 0.08, Tree3: 0.09, Tree4: 0.08, tree_1_a: 0.13, bush_1: 0.12
+  lamp_1: 0.065, lamp_2: 0.065, hazzard_cone_1: 0.13, traffic_barell_1: 0.08, Tree3: 0.09, Tree4: 0.08
 };
 export const VEHICLES = {
   car: ['Car_Blue', 'Car_Coral', 'Car_Sand', 'Car_Silver', 'Car_Teal'],

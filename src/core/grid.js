@@ -470,8 +470,8 @@ export function layoutGrid(analysis, opts = {}) {
     const r = rng();
     if (r < 0.48) put(TREES[Math.floor(rng() * TREES.length)], x, z, rng() * 6.28, 1.05 + rng() * 0.5);
     else if (r < 0.64) put(r < 0.56 ? 'fp_tree2' : 'fp_tree6', x, z, rng() * 6.28, 0.85 + rng() * 0.35);
-    else if (r < 0.9) put(['rk_Tree3', 'rk_Tree4', 'rk_tree_1_a'][Math.floor(rng() * 3)], x, z, rng() * 6.28, 0.85 + rng() * 0.35);
-    else put('rk_bush_1', x, z, rng() * 6.28, 0.8 + rng() * 0.4);
+    else if (r < 0.9) put(['rk_Tree3', 'rk_Tree4'][Math.floor(rng() * 2)], x, z, rng() * 6.28, 0.85 + rng() * 0.35);
+    else put(TREES[Math.floor(rng() * TREES.length)], x, z, rng() * 6.28, 0.55 + rng() * 0.25); // petit arbre (buisson)
   };
   const off = () => (rng() - 0.5) * CELL * 0.5;
   for (const g of greens) {
@@ -489,18 +489,18 @@ export function layoutGrid(analysis, opts = {}) {
         put('fp_bench2', edgeX - tx * CELL * 0.12, edgeZ - tz * CELL * 0.12, along + (dz > 0 || dx > 0 ? Math.PI : 0));
         const lamp = rng();
         put(lamp < 0.5 ? 'fp_streetLight' : lamp < 0.8 ? 'rk_lamp_1' : 'rk_lamp_2', edgeX + tx * CELL * 0.3, edgeZ + tz * CELL * 0.3, along + (lamp >= 0.5 ? Math.atan2(-dx, -dz) - along : 0));
-        if (rng() < 0.6) put('fp_garbageBin', edgeX + tx * CELL * 0.14, edgeZ + tz * CELL * 0.14, rng() * 6.28);
+        if (rng() < 0.6) put(rng() < 0.5 ? 'fp_trashBag1' : 'fp_trashBag2', edgeX + tx * CELL * 0.14, edgeZ + tz * CELL * 0.14, rng() * 6.28);
         tree(g.x - dx * CELL * 0.2 + off() * 0.4, g.z - dz * CELL * 0.2 + off() * 0.4);
       } else if (r < 0.52) {                // jardin
         put('fp_garden1', g.x, g.z, Math.floor(rng() * 4) * Math.PI / 2);
-        if (rng() < 0.4) put('fp_fireHydrant', edgeX + tx * CELL * 0.38, edgeZ + tz * CELL * 0.38, rng() * 6.28);
+        if (rng() < 0.4) put('fp_trafficCone', edgeX + tx * CELL * 0.38, edgeZ + tz * CELL * 0.38, rng() * 6.28);
       } else if (r < 0.66) {                // petit parking
         paved.push(g.cz * cols + g.cx);
         const n = 1 + Math.floor(rng() * 2);
         for (let k = 0; k < n; k++) {
-          const car = rng() < 0.3 ? 'fp_redCar' : VEHICLES.car[Math.floor(rng() * VEHICLES.car.length)];
+          const car = VEHICLES.car[Math.floor(rng() * VEHICLES.car.length)];
           const t = (k - (n - 1) / 2) * CELL * 0.34;
-          put(car, g.x + tx * t, g.z + tz * t, along + Math.PI / 2 + (rng() < 0.5 ? Math.PI : 0), car === 'fp_redCar' ? 1 : 2.2);
+          put(car, g.x + tx * t, g.z + tz * t, along + Math.PI / 2 + (rng() < 0.5 ? Math.PI : 0), 2.2);
         }
         const extra = rng();
         if (extra < 0.3) put('fp_trafficCone', edgeX + tx * CELL * 0.4, edgeZ + tz * CELL * 0.4, rng() * 6.28);
@@ -513,7 +513,7 @@ export function layoutGrid(analysis, opts = {}) {
     } else {
       if (r < 0.3) put('fp_garden1', g.x, g.z, Math.floor(rng() * 4) * Math.PI / 2);
       else if (r < 0.62) { tree(g.x + off(), g.z + off()); if (rng() < 0.4) tree(g.x + off(), g.z + off()); }
-      else if (r < 0.72) { put('fp_garbageBin', g.x + off(), g.z + off(), rng() * 6.28); put(rng() < 0.5 ? 'fp_trashBag1' : 'fp_trashBag2', g.x + off(), g.z + off(), rng() * 6.28); }
+      else if (r < 0.72) { put('fp_trashBag1', g.x + off(), g.z + off(), rng() * 6.28); put('fp_trashBag2', g.x + off(), g.z + off(), rng() * 6.28); }
     }
   }
   for (const d of decor) if (TREES.includes(d.model)) trees.push({ x: d.x, z: d.z, s: d.s, kind: TREES.indexOf(d.model) });

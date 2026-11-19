@@ -21,7 +21,8 @@ Plus un fichier grossit, plus son bâtiment monte en gamme.
 
 ## ✨ En bref
 
-- 🏗️ **Une ville vivante** : bâtiments low poly à 8 stades, routes à 8 niveaux, circulation avec feux et bouchons, jour et nuit.
+- 🏗️ **Une ville vivante** : bâtiments low poly à 8 stades, routes à 4 gabarits, rivière et ponts, ronds-points, circulation avec feux et bouchons, jour et nuit.
+- 🐧 **Même pour un projet énorme** : le noyau Linux (97 000 fichiers) devient une ville fluide, construite en quelques secondes.
 - 📈 **Elle évolue avec ton code** : à chaque nouvelle génération, les fichiers qui ont grandi font monter leur bâtiment, sous tes yeux.
 - 🌄 **Une carte unique par projet** : campagne procédurale (collines, lacs, forêts) posée sur un socle de diorama.
 - 🔒 **100 % local** : un seul fichier HTML, aucune requête réseau, pas une ligne de ton code copiée.
@@ -57,7 +58,7 @@ Plus un fichier grossit, plus son bâtiment monte en gamme.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/traffic.jpg" alt="Circulation : feux, files d'attente, monument"><br><sub><b>🚦 Circulation</b> : les voitures roulent à droite, gardent leurs distances et s'arrêtent aux feux.</sub></td>
+    <td width="50%"><img src="docs/traffic.jpg" alt="Circulation : pont sur la rivière, carrefour à feux"><br><sub><b>🚦 Circulation</b> : les voitures roulent à droite, montent sur les ponts, s'arrêtent aux feux et cèdent le passage dans les ronds-points.</sub></td>
     <td width="50%"><img src="docs/night.jpg" alt="La ville de nuit"><br><sub><b>🌙 La nuit</b> : les lampadaires s'allument, les fenêtres s'allument et s'éteignent étage par étage.</sub></td>
   </tr>
   <tr>
@@ -75,13 +76,13 @@ Plus un fichier grossit, plus son bâtiment monte en gamme.
 - **Évolution.** À chaque génération, Bitropolis compare avec la précédente : la CLI relit l'ancien `index.html`, le navigateur se souvient de ta dernière visite. Les bâtiments qui ont grandi et les nouveaux fichiers sortent de terre, avec une étiquette « Résidence N3 → N4 ».
 - **Routes N1 → N8.** Chaque dépendance entre deux quartiers est acheminée par le plus court chemin routier. Les avenues les plus chargées deviennent des boulevards éclairés, et des monuments s'installent sur leurs places.
 - **Variété.** Plusieurs familles et variantes de couleurs par type de fichier, palettes recolorées, bâtiments inversés en miroir, jardins, placettes et parkings : deux projets ne se ressemblent jamais.
-- **Vie.** Feux tricolores et priorité à droite, éoliennes qui tournent, cheminées qui fument, fontaines qui jaillissent.
+- **Vie.** Une rivière traverse la ville : chaque rue la franchit par un pont. Feux tricolores, priorité à droite, ronds-points, passages supérieurs sur les grands carrefours ; éoliennes qui tournent, cheminées qui fument, fontaines qui jaillissent.
 
 ## 🚀 Utilisation
 
 ### Option 1 : sans rien installer
 
-Ouvre la **[démo en ligne](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, ou [`dist/bitropolis.html`](dist/bitropolis.html) en local (double-clic), puis **glisse-dépose ton dossier** ou clique sur « 📁 Ouvrir un dossier de code ». Tout se passe dans ton navigateur : rien n'est envoyé.
+Ouvre la **[démo en ligne](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, ou [`dist/bitropolis.html`](dist/bitropolis.html) en local (double-clic), puis **glisse-dépose ton dossier** ou clique sur « 📁 Ouvrir un dossier de code ». Tout se passe dans ton navigateur : rien n'est envoyé. La démo en ligne est volontairement un petit projet, pour s'ouvrir en un clin d'œil ; ton projet, lui, peut être immense (une barre de progression suit l'import).
 
 ### Option 2 : en ligne de commande (Node.js ≥ 18)
 
@@ -127,10 +128,25 @@ Barre d'outils : 🌙 jour / nuit · 🔗 toutes les liaisons · 🚗 trafic · 
 
 > 🌐 L'interface et la CLI parlent **français, anglais, allemand, italien, espagnol, chinois et russe** : la langue du navigateur (ou du système) est choisie automatiquement, et le menu de langue de la barre d'outils permet d'en changer.
 
-## 🏙️ Et sur un vrai gros projet ?
+## 🐧 Et sur un très gros projet ? Le noyau Linux
 
-![La ville des sources de three.js](docs/threejs.jpg)
-<p align="center"><sub>Les sources de three.js : 374 bâtiments, construits en moins d'une seconde.</sub></p>
+![La ville du noyau Linux : 4 000 bâtiments, le quartier drivers au premier plan](docs/linux.jpg)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/linux-close.jpg" alt="Au cœur de la ville Linux : des gratte-ciel"><br><sub><b>🏙️ Au cœur de la ville</b> : les fichiers les plus importants et les plus importés deviennent des gratte-ciel.</sub></td>
+    <td width="50%"><img src="docs/linux-night.jpg" alt="La ville Linux de nuit"><br><sub><b>🌃 De nuit</b> : des milliers de tours, éclairées étage par étage.</sub></td>
+  </tr>
+</table>
+
+Le noyau Linux, c'est **97 000 fichiers**. Bitropolis les parcourt tous, en retient **4 000 représentatifs** (chaque grand dossier a sa part : `drivers`, `arch`, `kernel`, `mm`, `net`…), relie les `#include` (**près de 5 900 liaisons**) et bâtit la ville **en 7 secondes**. À l'écran, seuls les bâtiments visibles sont dessinés, les plus lointains en version simplifiée : la ville reste fluide.
+
+Pour la construire toi-même :
+
+```bash
+git clone --depth 1 https://github.com/torvalds/linux.git
+npx bitropolis linux
+```
 
 ## 🔒 100 % local, vraiment
 
@@ -187,6 +203,8 @@ npm run build    # régénère dist/bitropolis.html
 - [x] Ville en grille avec bâtiments à stades et routes à niveaux
 - [x] Circulation, feux tricolores, priorité à droite
 - [x] Évolution animée entre deux générations
+- [x] Rivière, ponts, passages supérieurs et ronds-points
+- [x] Très grands projets : sélection représentative, niveaux de détail
 - [ ] Historique Git : voir la ville se construire commit après commit
 - [ ] Mode « visite » à la première personne
 - [ ] Météo selon l'état du projet (TODO, tests qui échouent…)

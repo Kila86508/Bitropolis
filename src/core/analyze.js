@@ -300,7 +300,31 @@ function classify(f) {
 
 const ENTRY_RX = /^(main|index|app|server|program|__main__|manage|cli|application|bootstrap|start|run|entry|lib|mod|game|init)$/i;
 
+// Analyse complète, d'un bloc (CLI, tests).
 export function analyzeProject(rawFiles, options = {}) {
+  const it = analyzeSteps(rawFiles, options);
+  let r = it.next();
+  while (!r.done) r = it.next();
+  return r.value;
+}
+
+// Même analyse, en rendant la main au navigateur toutes les ~40 ms : la page reste réactive sur un très gros
+// projet. onProgress({ step: 'metrics' | 'links', i, n }).
+export async function analyzeProjectAsync(rawFiles, options = {}, onProgress = null) {
+  const it = analyzeSteps(rawFiles, options);
+  let r = it.next(), t0 = performance.now();
+  while (!r.done) {
+    if (performance.now() - t0 > 40) {
+      if (onProgress) onProgress(r.value);
+      await new Promise((res) => setTimeout(res, 0));
+      t0 = performance.now();
+    }
+    r = it.next();
+  }
+  return r.value;
+}
+
+function* analyzeSteps(rawFiles, options = {}) {
   const projectName = options.name || 'projet';
   let list = rawFiles
     .filter((f) => f && f.path)
@@ -316,7 +340,10 @@ export function analyzeProject(rawFiles, options = {}) {
     truncated += before - list.length;
   }
 
-  const files = list.map((raw, id) => {
+  const files = [];
+  for (let id = 0; id < list.length; id++) {
+    if (id % 25 === 0) yield { step: 'metrics', i: id, n: list.length };
+    const raw = list[id];
     const ext = extOf(raw.path);
     const text = typeof raw.content === 'string' ? raw.content : null;
     let loc = 0, lines = 0;
@@ -326,7 +353,7 @@ export function analyzeProject(rawFiles, options = {}) {
       for (const l of ls) if (l.trim()) loc++;
     }
     const isCode = CODE_EXT.has(ext);
-    return {
+    files.push({
       id, path: raw.path, name: baseName(raw.path), dir: dirName(raw.path), ext,
       lang: langOf(raw.path), size: raw.size || (text ? text.length : 0), lines, loc,
       funcs: text && isCode ? countMatches(RX.funcs, text) : 0,
@@ -336,13 +363,14 @@ export function analyzeProject(rawFiles, options = {}) {
       isCode,
       specs: text ? extractImports(raw.path, ext, text) : [],
       imports: [], importedBy: [], external: 0
-    };
-  });
+    });
+  }
 
   // Résolution des dépendances internes.
   const idx = buildIndex(files);
   const externals = new Map();
   for (const f of files) {
+    if (f.id % 100 === 0) yield { step: 'links', i: f.id, n: files.length };
     const seen = new Set();
     for (const spec of f.specs) {
       const id = resolveSpec(f, spec, idx, files);

@@ -45,6 +45,56 @@ function asKey(P, name) {
 }
 export function packModel(pack, name) { const P = asPacks[pack]; return (P && P.models[asKey(P, name)]) || null; }
 
+// Version simplifiée d'un modèle pour les objets lointains : les sommets sont regroupés sur une grille de
+// `cell` unités (un lot = 1 unité) — couleur et éclairage compris, donc chaque matériau garde ses couleurs —
+// et les triangles devenus plats ou en double disparaissent. Les gratte-ciel passent ainsi de ~27 000 à ~4 500
+// triangles. Renvoie null si le gain est trop faible pour valoir une seconde géométrie.
+export function packLodGeometry(pack, name, cell = 0.035) {
+  const P = asPacks[pack];
+  if (!P) return null;
+  const key = name + '~' + cell;
+  if (P.cache.has(key)) return P.cache.get(key);
+  const g = packGeometry(pack, name);
+  let out = null;
+  if (g && g.index) {
+    const pos = g.getAttribute('position').array, col = g.getAttribute('color').array, lit = g.getAttribute('aLit').array, role = g.getAttribute('aRole').array;
+    const I = g.index.array, n = pos.length / 3, rep = new Int32Array(n), keep = [];
+    const map = new Map();
+    for (let v = 0; v < n; v++) {
+      const k = `${Math.round(pos[v * 3] / cell)},${Math.round(pos[v * 3 + 1] / cell)},${Math.round(pos[v * 3 + 2] / cell)},${col[v * 3]},${col[v * 3 + 1]},${col[v * 3 + 2]},${lit[v]},${role[v]}`;
+      let r = map.get(k);
+      if (r === undefined) { r = keep.length; map.set(k, r); keep.push(v); }
+      rep[v] = r;
+    }
+    const idx = [], seen = new Set();
+    for (let i = 0; i < I.length; i += 3) {
+      const a = rep[I[i]], b = rep[I[i + 1]], c = rep[I[i + 2]];
+      if (a === b || b === c || a === c) continue;
+      const lo = Math.min(a, b, c), hi = Math.max(a, b, c), t = `${lo},${a + b + c - lo - hi},${hi}`;
+      if (seen.has(t)) continue;
+      seen.add(t); idx.push(a, b, c);
+    }
+    if (idx.length < I.length * 0.7) {
+      const m = keep.length, p2 = new Float32Array(m * 3), c2 = new Float32Array(m * 3), l2 = new Float32Array(m), r2 = new Float32Array(m);
+      keep.forEach((v, i) => {
+        p2[i * 3] = pos[v * 3]; p2[i * 3 + 1] = pos[v * 3 + 1]; p2[i * 3 + 2] = pos[v * 3 + 2];
+        c2[i * 3] = col[v * 3]; c2[i * 3 + 1] = col[v * 3 + 1]; c2[i * 3 + 2] = col[v * 3 + 2];
+        l2[i] = lit[v]; r2[i] = role[v];
+      });
+      out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(p2, 3));
+      out.setAttribute('color', new THREE.BufferAttribute(c2, 3));
+      out.setAttribute('aLit', new THREE.BufferAttribute(l2, 1));
+      out.setAttribute('aRole', new THREE.BufferAttribute(r2, 1));
+      out.setIndex(new THREE.BufferAttribute(m > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
+      out.computeVertexNormals();
+      out.computeBoundingSphere();
+    }
+  }
+  P.cache.set(key, out);
+  return out;
+}
+
 // Inverse de encode16 (scripts/assets.js) : deux plans d'octets → écarts → valeurs, composante par composante.
 export function asDecode16(buf, offset, n, stride, Ctor) {
   const b = new Uint8Array(buf, offset, n * 2), out = new Ctor(n);

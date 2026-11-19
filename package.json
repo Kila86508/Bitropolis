@@ -1,6 +1,6 @@
 {
   "name": "bitropolis",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Turn your code into a living 3D city: folders become districts, files become buildings that grow with your code. 100% local.",
   "keywords": [
     "code",

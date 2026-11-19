@@ -21,7 +21,8 @@ The bigger a file gets, the more its building levels up.
 
 ## ✨ At a glance
 
-- 🏗️ **A living city**: low poly buildings with 8 growth stages, 8 road tiers, traffic with lights and jams, day and night.
+- 🏗️ **A living city**: low poly buildings with 8 growth stages, 4 road sizes, a river with bridges, roundabouts, traffic with lights and jams, day and night.
+- 🐧 **Even for a huge project**: the Linux kernel (97,000 files) becomes a smooth city, built in seconds.
 - 📈 **It evolves with your code**: every time you regenerate, the files that grew level up their building right in front of you.
 - 🌄 **A unique map per project**: procedural countryside (hills, lakes, forests) on a diorama base.
 - 🔒 **100% local**: one single HTML file, no network requests, not a single line of your code copied.
@@ -57,7 +58,7 @@ The bigger a file gets, the more its building levels up.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/traffic.jpg" alt="Traffic: lights, queues, monument"><br><sub><b>🚦 Traffic</b>: cars drive on the right, keep their distance and stop at red lights.</sub></td>
+    <td width="50%"><img src="docs/traffic.jpg" alt="Traffic: bridge over the river, signalized crossroads"><br><sub><b>🚦 Traffic</b>: cars drive on the right, climb onto bridges, stop at red lights and give way in roundabouts.</sub></td>
     <td width="50%"><img src="docs/night.jpg" alt="The city at night"><br><sub><b>🌙 Night</b>: street lamps turn on, windows switch on and off floor by floor.</sub></td>
   </tr>
   <tr>
@@ -75,13 +76,13 @@ The bigger a file gets, the more its building levels up.
 - **Evolution.** On every generation, Bitropolis compares with the previous one: the CLI reads the old `index.html`, the browser remembers your last visit. Buildings that grew and new files rise from the ground, with a label like “Résidence N3 → N4”.
 - **Roads N1 → N8.** Every dependency between two districts is routed along the shortest road path. The busiest avenues become lit boulevards, and monuments settle on their squares.
 - **Variety.** Several families and color variants per file type, recolored palettes, mirrored buildings, gardens, small squares and parking lots: no two projects look alike.
-- **Life.** Traffic lights and right-of-way, spinning wind turbines, smoking chimneys, splashing fountains.
+- **Life.** A river crosses the city and every street spans it with a bridge. Traffic lights, right-of-way, roundabouts, overpasses on the big crossroads; spinning wind turbines, smoking chimneys, splashing fountains.
 
 ## 🚀 Usage
 
 ### Option 1: nothing to install
 
-Open the **[live demo](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, or [`dist/bitropolis.html`](dist/bitropolis.html) locally (double-click), then **drag and drop your folder** or click “📁 Open a code folder”. Everything happens in your browser: nothing is uploaded.
+Open the **[live demo](https://kila86508.github.io/Bitropolis/dist/bitropolis.html)**, or [`dist/bitropolis.html`](dist/bitropolis.html) locally (double-click), then **drag and drop your folder** or click “📁 Open a code folder”. Everything happens in your browser: nothing is uploaded. The live demo is deliberately a small project so it opens in a blink; your own project can be huge (a progress bar follows the import).
 
 ### Option 2: command line (Node.js ≥ 18)
 
@@ -127,10 +128,25 @@ Toolbar: 🌙 day / night · 🔗 all dependencies · 🚗 traffic · 🏷️ di
 
 > 🌐 The interface and the CLI speak **English, French, German, Italian, Spanish, Chinese and Russian**: your browser (or system) language is picked automatically, and the language menu in the toolbar switches it.
 
-## 🏙️ What about a really big project?
+## 🐧 What about a huge project? The Linux kernel
 
-![The city of three.js sources](docs/threejs.jpg)
-<p align="center"><sub>The three.js sources: 374 buildings, built in under a second.</sub></p>
+![The Linux kernel city: 4,000 buildings, the drivers district in front](docs/linux.jpg)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/linux-close.jpg" alt="Downtown Linux: skyscrapers"><br><sub><b>🏙️ Downtown</b>: the most important, most imported files become skyscrapers.</sub></td>
+    <td width="50%"><img src="docs/linux-night.jpg" alt="The Linux city at night"><br><sub><b>🌃 At night</b>: thousands of towers, lit floor by floor.</sub></td>
+  </tr>
+</table>
+
+The Linux kernel is **97,000 files**. Bitropolis walks through all of them, keeps **4,000 representative ones** (every big folder gets its share: `drivers`, `arch`, `kernel`, `mm`, `net`…), links the `#include`s (**almost 5,900 links**) and builds the city **in 7 seconds**. On screen, only visible buildings are drawn, distant ones in a simplified version: the city stays smooth.
+
+To build it yourself:
+
+```bash
+git clone --depth 1 https://github.com/torvalds/linux.git
+npx bitropolis linux
+```
 
 ## 🔒 100% local, for real
 
@@ -187,6 +203,8 @@ npm run build    # rebuilds dist/bitropolis.html
 - [x] Grid city with growing buildings and tiered roads
 - [x] Traffic, traffic lights, right-of-way
 - [x] Animated evolution between two generations
+- [x] River, bridges, overpasses and roundabouts
+- [x] Huge projects: representative selection, levels of detail
 - [ ] Git history: watch the city being built commit by commit
 - [ ] First-person “walk” mode
 - [ ] Weather based on project health (TODOs, failing tests…)

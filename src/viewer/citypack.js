@@ -2,7 +2,7 @@
 // Sol, routes (8 niveaux), bâtiments à stades N1→N8, arbres et monuments : un InstancedMesh par modèle.
 import { CELL } from '../core/grid.js';
 import { TREES, GROUNDS, VARIANTS, chainOf, footprint, familyOf, kitRoad } from '../core/catalog.js';
-import { packGeometry, packModel } from './assets.js';
+import { packGeometry, packModel, packLodGeometry } from './assets.js';
 import { hashString } from '../core/rules.js';
 
 // Harmonies de couleurs pour les matériaux recolorables du pack (murs 1–3, toit, boiseries, accent).
@@ -27,6 +27,7 @@ const GROUND_Y = CITY_Y - 0.012 * CELL; // dalles de sol, légèrement sous les 
 
 // Matériau des modèles du pack : couleurs par sommet, et la nuit :
 //  - fenêtres (aLit = 1) allumées étage par étage, qui s'allument et s'éteignent chacune à son rythme ;
+//  - façades vitrées (aLit = 9) : même principe, plus doux et plus clairsemé ;
 //  - lampadaires et signaux lumineux (aLit = 2) toujours allumés ;
 //  - lentilles des feux tricolores (aLit 3–5 : têtes « X », 6–8 : têtes « Y » ; rouge, vert, orange),
 //    commandées par l'attribut d'instance aSig = (état X, état Y) : 0 rouge, 1 orange, 2 vert.
@@ -38,15 +39,17 @@ export function makePackMaterial(uGlow, uTime) {
     sh.uniforms.uGlow = uGlow;
     sh.uniforms.uTime = uTime;
     sh.uniforms.uScheme = { value: schemes };
-    sh.vertexShader = `attribute float aLit;\nattribute float aRole;\nattribute float aSeed;\nattribute vec2 aSig;\nuniform float uTime;\nuniform vec3 uScheme[${schemes.length}];\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\n` +
+    sh.vertexShader = `attribute float aLit;\nattribute float aRole;\nattribute float aSeed;\nattribute vec2 aSig;\nuniform float uTime;\nuniform vec3 uScheme[${schemes.length}];\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\n` +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      // identité stable de l'instance (sa graine), même quand le niveau de détail renumérote les instances
       #ifdef USE_INSTANCING
-        float bxId = float(gl_InstanceID);
+        float bxId = floor(aSeed * 65536.0);
       #else
         float bxId = 0.0;
       #endif
       float bxRnd = fract(sin(bxId * 12.9898 + 78.233) * 43758.5453);
       vLit = 0.0; vLamp = 0.0; vOn = 0.0; vLampCol = vec3(0.0);
+      vWin = 0.0; vFy = position.y; vRnd = bxRnd; vIdS = bxId;
       vRecol = vec3(0.0); vRecolOn = 0.0;
       #ifdef USE_INSTANCING
       if (aRole > 0.5) {
@@ -54,7 +57,9 @@ export function makePackMaterial(uGlow, uTime) {
         if (si > 0.5) { vRecol = uScheme[int(si - 1.0) * 6 + int(aRole + 0.5) - 1]; vRecolOn = 1.0; }
       }
       #endif
-      if (aLit > 2.5) {
+      if (aLit > 8.5) {
+        vWin = 2.0; // façade vitrée : étages calculés par pixel (voir le fragment), plus doux qu'une fenêtre
+      } else if (aLit > 2.5) {
         float axisY = aLit > 5.5 ? 1.0 : 0.0;
         float lamp = aLit - (axisY > 0.5 ? 6.0 : 3.0);             // 0 rouge, 1 vert, 2 orange
         float st = axisY > 0.5 ? aSig.y : aSig.x;                  // 0 rouge, 1 orange, 2 vert
@@ -65,22 +70,29 @@ export function makePackMaterial(uGlow, uTime) {
       } else if (aLit > 1.5) {
         vLit = 1.6;
       } else if (aLit > 0.5) {
-        // un étage = une bande de hauteur ; chaque étage change d'état à son propre rythme
-        float floorId = floor(position.y * 9.0);
-        float period = 9.0 + 26.0 * fract(bxRnd * 7.31 + floorId * 0.173);
-        float cycle = floor(uTime / period + bxRnd * 31.0 + floorId * 0.37);
-        float h = fract(sin(floorId * 91.7 + bxId * 12.9898 + cycle * 37.719) * 43758.5453);
-        vLit = h > 0.42 ? 0.4 : 0.0;
+        vWin = 1.0; // fenêtre : étages calculés par pixel (un grand panneau vitré couvre plusieurs étages)
       }`);
-    sh.fragmentShader = 'uniform float uGlow;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\n' + sh.fragmentShader
+    sh.fragmentShader = 'uniform float uGlow;\nuniform float uTime;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         diffuseColor.rgb = mix(diffuseColor.rgb, vRecol, vRecolOn);
         if (vLamp > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb * 0.22, vLampCol * 0.55, vOn);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        totalEmissiveRadiance += mix(vec3(1.0, 0.68, 0.32), vColor.rgb, 0.15) * uGlow * vLit;
+        // fenêtres : un étage = une bande de hauteur, chaque étage s'allume et s'éteint à son propre rythme
+        float litF = vLit;
+        if (vWin > 0.5) {
+          // graine arrondie à un entier : le hachage ne dépend plus des infimes écarts d'interpolation entre pixels
+          float sd = floor(vRnd * 997.0 + 0.5), sr = sd / 997.0;
+          float glass = step(1.5, vWin);
+          float fl = floor(vFy * 9.0);
+          float period = mix(9.0 + 26.0 * fract(sr * 7.31 + fl * 0.173), 12.0 + 30.0 * fract(sr * 5.17 + fl * 0.231), glass);
+          float cyc = floor(uTime / period + sr * 31.0 + fl * 0.37);
+          float hh = fract(sin(fl * 91.7 + sd * 12.9898 + cyc * 37.719) * 43758.5453);
+          litF = glass > 0.5 ? (hh > 0.62 ? 0.16 : 0.0) : (hh > 0.42 ? 0.4 : 0.0);
+        }
+        totalEmissiveRadiance += mix(vec3(1.0, 0.68, 0.32), vColor.rgb, 0.15) * uGlow * litF;
         if (vLamp > 0.5) totalEmissiveRadiance += vLampCol * vOn * (0.7 + 1.6 * uGlow);`);
   };
-  mat.customProgramCacheKey = () => 'bitropolis-pack-3';
+  mat.customProgramCacheKey = () => 'bitropolis-pack-5';
   return mat;
 }
 
@@ -99,9 +111,15 @@ class PackInstancer {
     list.push({ m: matrix.clone(), seed });
     return { model, index: list.length - 1 };
   }
-  build(group, meshes, { shadow = true } = {}) {
+  // lod : PackLOD facultatif ; manage(model, list) dit si ce modèle passe par lui
+  build(group, meshes, { shadow = true, lod = null, manage = null } = {}) {
     for (const [model, list] of this.lists) {
-      const geo = packGeometry('city', model);
+      if (lod && manage && manage(model, list)) {
+        const mesh = lod.add(model, list, this.material, group, shadow);
+        if (mesh) meshes.set(model, mesh);
+        continue;
+      }
+      const geo = packGeoView(packGeometry('city', model));
       if (!geo) continue;
       const mesh = new THREE.InstancedMesh(geo, this.material, list.length);
       const seeds = new Float32Array(list.length);
@@ -115,6 +133,110 @@ class PackInstancer {
       meshes.set(model, mesh);
     }
     this.lists.clear();
+  }
+}
+
+// Enveloppe propre à un groupe d'instances autour d'une géométrie du pack : mêmes données de sommets (partagées
+// sur la carte graphique), mais ses propres attributs d'instance (aSeed). Sans elle, les voitures garées du décor
+// et celles qui circulent (même modèle) se disputaient l'attribut, et les secondes n'étaient plus dessinées.
+function packGeoView(src) {
+  if (!src) return null;
+  const g = new THREE.BufferGeometry();
+  for (const [k, a] of Object.entries(src.attributes)) if (k !== 'aSeed') g.setAttribute(k, a);
+  g.setIndex(src.index);
+  g.boundingSphere = src.boundingSphere; g.boundingBox = src.boundingBox;
+  return g;
+}
+
+// Grandes villes : on ne dessine que ce qui est dans le champ de la caméra, et les objets lointains en version
+// simplifiée (packLodGeometry). Chaque modèle géré a deux InstancedMesh (complet / simplifié) que l'on
+// remplit à chaque mouvement de caméra avec les seules instances visibles. Les pièces mobiles, les tuiles à feux
+// (attribut aSig indexé) et les petits modèles (moins coûteux à dessiner qu'à trier) ne sont pas gérés ici.
+export const LOD_NEAR = 64;   // au-delà (mètres de la scène), version simplifiée
+export class PackLOD {
+  constructor() {
+    this.models = new Map();
+    this.frustum = new THREE.Frustum();
+    this.pm = new THREE.Matrix4();
+    this.lastCam = new Float32Array(32);
+    this.dirty = true;
+  }
+  owns(model) { return this.models.has(model); }
+  // list : [{ m: Matrix4, seed }] (voir PackInstancer)
+  add(model, list, material, group, castShadow) {
+    const full = packGeoView(packGeometry('city', model));
+    if (!full) return null;
+    const lodGeo = packGeoView(packLodGeometry('city', model));
+    const n = list.length, mats = new Float32Array(n * 16), seeds = new Float32Array(n), spheres = new Float32Array(n * 4);
+    if (!full.boundingSphere) full.computeBoundingSphere();
+    const bs = full.boundingSphere, v = new THREE.Vector3();
+    list.forEach((it, i) => {
+      it.m.toArray(mats, i * 16);
+      seeds[i] = it.seed;
+      this._sphere(mats, i, bs, spheres, v);
+    });
+    const mk = (geo) => {
+      const mesh = new THREE.InstancedMesh(geo, material, n);
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(new Float32Array(n), 1).setUsage(THREE.DynamicDrawUsage));
+      mesh.castShadow = castShadow; mesh.receiveShadow = true;
+      mesh.name = model;
+      group.add(mesh);
+      return mesh;
+    };
+    const entry = { model, n, mats, seeds, spheres, bs, full: mk(full), lod: lodGeo ? mk(lodGeo) : null };
+    this.models.set(model, entry);
+    this.dirty = true;
+    return entry.full;
+  }
+  _sphere(mats, i, bs, spheres, v) {
+    const o = i * 16;
+    v.copy(bs.center).applyMatrix4(new THREE.Matrix4().fromArray(mats, o));
+    const s = Math.max(Math.hypot(mats[o], mats[o + 1], mats[o + 2]), Math.hypot(mats[o + 4], mats[o + 5], mats[o + 6]), Math.hypot(mats[o + 8], mats[o + 9], mats[o + 10]));
+    spheres[i * 4] = v.x; spheres[i * 4 + 1] = v.y; spheres[i * 4 + 2] = v.z; spheres[i * 4 + 3] = bs.radius * s;
+  }
+  // une instance a bougé (animation de croissance)
+  setMatrix(model, index, matrix) {
+    const e = this.models.get(model);
+    if (!e) return;
+    matrix.toArray(e.mats, index * 16);
+    this._sphere(e.mats, index, e.bs, e.spheres, new THREE.Vector3());
+    this.dirty = true;
+  }
+  update(camera) {
+    camera.updateMatrixWorld();
+    const a = camera.matrixWorld.elements, b = camera.projectionMatrix.elements, last = this.lastCam;
+    let moved = this.dirty;
+    for (let i = 0; i < 16 && !moved; i++) if (Math.abs(a[i] - last[i]) > 1e-4 || Math.abs(b[i] - last[16 + i]) > 1e-6) moved = true;
+    if (!moved) return;
+    for (let i = 0; i < 16; i++) { last[i] = a[i]; last[16 + i] = b[i]; }
+    this.dirty = false;
+    this.pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.pm);
+    const planes = this.frustum.planes.map((p) => [p.normal.x, p.normal.y, p.normal.z, p.constant]);
+    const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z, near2 = LOD_NEAR * LOD_NEAR;
+    for (const e of this.models.values()) {
+      const F = e.full.instanceMatrix.array, FS = e.full.geometry.getAttribute('aSeed').array;
+      const L = e.lod ? e.lod.instanceMatrix.array : null, LS = e.lod ? e.lod.geometry.getAttribute('aSeed').array : null;
+      let nf = 0, nl = 0;
+      const S = e.spheres, M = e.mats;
+      for (let i = 0; i < e.n; i++) {
+        const x = S[i * 4], y = S[i * 4 + 1], z = S[i * 4 + 2], r = S[i * 4 + 3] + 2; // marge : ombres en bord d'écran
+        let inside = true;
+        for (let p = 0; p < 6; p++) { const P = planes[p]; if (P[0] * x + P[1] * y + P[2] * z + P[3] < -r) { inside = false; break; } }
+        if (!inside) continue;
+        const d2 = (x - cx) * (x - cx) + (y - cy) * (y - cy) + (z - cz) * (z - cz);
+        const useLod = L && d2 > near2 + r * r;
+        const dst = useLod ? L : F, ds = useLod ? LS : FS, j = useLod ? nl++ : nf++;
+        const o = i * 16, q = j * 16;
+        for (let k = 0; k < 16; k++) dst[q + k] = M[o + k];
+        ds[j] = e.seeds[i];
+      }
+      e.full.count = nf; e.full.instanceMatrix.needsUpdate = true; e.full.geometry.getAttribute('aSeed').needsUpdate = true;
+      if (e.lod) { e.lod.count = nl; e.lod.instanceMatrix.needsUpdate = true; e.lod.geometry.getAttribute('aSeed').needsUpdate = true; }
+    }
   }
 }
 
@@ -277,7 +399,24 @@ export function buildPackCity(city, analysis, material, rng) {
     return mon;
   });
 
-  I.build(group, meshes);
+  // modèles gérés par le niveau de détail : bâtiments, routes, arbres… (assez de triangles pour que le tri
+  // en vaille la peine), hors pièces mobiles et tuiles à feux
+  const lod = new PackLOD();
+  const signal = /^(Road_(T|Cross)_N[5-8]|(Route|Avenue)_(T|Croix))$/;
+  I.build(group, meshes, {
+    lod,
+    manage: (model) => {
+      if (model.includes('#') || signal.test(model) || /^Ground_/.test(model)) return false;
+      const g = packGeometry('city', model);
+      return !!g && g.index && g.index.count / 3 >= 150;
+    }
+  });
+  for (const e of lod.models.values()) if (/^(Avenue|Route|PetiteRoute|Chemin|Riviere)_|^fp_(?!tree)|^rk_(?!Tree)/.test(e.model)) { e.full.castShadow = false; if (e.lod) e.lod.castShadow = false; }
+  // ombres portées : bâtiments, monuments et arbres seulement (routes, sol et petit mobilier en reçoivent sans en
+  // projeter : sur une grande ville, la passe d'ombre redessinait sinon des millions de triangles)
+  for (const [model, mesh] of meshes) {
+    if (/^(Avenue|Route|PetiteRoute|Chemin|Riviere|Ground)_|^fp_(?!tree)|^rk_(?!Tree)/.test(model)) mesh.castShadow = false;
+  }
   for (const pt of parts) pt.mesh = meshes.get(pt.ref.model);
   for (const r of roadRefs) r.mesh = meshes.get(r.model);
   // état des feux par tuile (aSig), piloté par la simulation de trafic
@@ -285,7 +424,7 @@ export function buildPackCity(city, analysis, material, rng) {
     if (!/^(Road_(T|Cross)_N[5-8]|(Route|Avenue)_(T|Croix))$/.test(model)) continue;
     mesh.geometry.setAttribute('aSig', new THREE.InstancedBufferAttribute(new Float32Array(mesh.count * 2), 2).setUsage(THREE.DynamicDrawUsage));
   }
-  return { group, buildings, monuments, meshes, parts: parts.filter((pt) => pt.mesh), fx, roadRefs };
+  return { group, buildings, monuments, meshes, parts: parts.filter((pt) => pt.mesh), fx, roadRefs, lod };
 }
 
 // Véhicules du pack (InstancedMesh par modèle) ; renvoie les meshes indexés par nom.
@@ -293,8 +432,9 @@ export function buildPackVehicles(names, counts, material) {
   const out = new Map();
   for (const name of names) {
     const n = counts.get(name) || 0;
-    const geo = packGeometry('city', name);
+    const geo = packGeoView(packGeometry('city', name));
     if (!geo || !n) continue;
+    geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(Float32Array.from({ length: n }, () => Math.random()), 1));
     const mesh = new THREE.InstancedMesh(geo, material, n);
     mesh.count = n; mesh.castShadow = true; mesh.frustumCulled = false;
     out.set(name, mesh);

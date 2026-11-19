@@ -196,6 +196,7 @@ export class CityRenderer {
     this.fx = null;
     this.animParts = [];
     this.traffic = null;
+    this.lod = null;
   }
 
   load(analysis, themeId = 'lowpoly') {
@@ -235,6 +236,7 @@ export class CityRenderer {
       this.buildings = pc.buildings;
       this.roundabouts = pc.monuments;
       this.packMeshes = pc.meshes;
+      this.lod = pc.lod;
       this.roadRefs = pc.roadRefs;
       this._buildFx(pc.parts, pc.fx, root);
     } else {
@@ -518,8 +520,8 @@ export class CityRenderer {
     const back = 1.70158, e = k <= 0 ? 0 : k >= 1 ? 1 : 1 + (back + 1) * Math.pow(k - 1, 3) + back * Math.pow(k - 1, 2);
     const sy = a.from + (1 - a.from) * e;
     d.position.set(a.x, CITY_Y, a.z); d.rotation.set(0, a.ry, 0); d.scale.set(a.mirror ? -CELL : CELL, CELL * Math.max(0.01, sy), CELL); d.updateMatrix();
-    a.mesh.setMatrixAt(a.index, d.matrix);
-    a.mesh.instanceMatrix.needsUpdate = true;
+    if (this.lod && a.b && a.b.ref && this.lod.owns(a.b.ref.model)) this.lod.setMatrix(a.b.ref.model, a.index, d.matrix);
+    else { a.mesh.setMatrixAt(a.index, d.matrix); a.mesh.instanceMatrix.needsUpdate = true; }
     if (a.b && a.b.matrix) a.b.matrix.copy(d.matrix); // les pièces mobiles et la fumée suivent la croissance
   }
 
@@ -843,7 +845,7 @@ export class CityRenderer {
   focusPoint(x, z, radius) { this.controls.flyTo(x, 0, z, radius || 30, 0.9); this.controls.autoRotate = false; }
   resetView() { if (this.home) this.controls.flyTo(0, 0, 0, this.home.radius, this.home.phi); }
 
-  screenshot() { this.renderer.render(this.scene, this.camera); return this.canvas.toDataURL('image/png'); }
+  screenshot() { if (this.lod) this.lod.update(this.camera); this.renderer.render(this.scene, this.camera); return this.canvas.toDataURL('image/png'); }
 
   _loop() {
     requestAnimationFrame(this._loop);
@@ -882,6 +884,7 @@ export class CityRenderer {
         for (const s of this.labels.children) s.material.opacity = Math.min(1, Math.max(0.15, (far - 15) / 40));
       }
     }
+    if (this.lod) this.lod.update(this.camera); // grandes villes : seulement ce qui est visible, simplifié au loin
     this.renderer.render(this.scene, this.camera);
   }
 }

@@ -106,7 +106,8 @@ function litOf(mat, nodeName = '') {
   if (lens && head) return (head[1] === 'X' ? 3 : 6) + { Red: 0, Green: 1, Off: 2 }[lens[1]];
   if (/Housing/i.test(name)) return 0;
   if (/NightLight|Signal_|Flash|Lamp_?Light|Neon/i.test(name)) return 2;
-  if (/window|glass|vitre/i.test(name)) return 1;
+  if (/window|vitre/i.test(name)) return 1;
+  if (/glass/i.test(name)) return 9; // façade vitrée : éclairage de nuit plus doux
   const e = mat && mat.emissiveFactor;
   if (e && e[0] + e[1] + e[2] > 0.3) return 2;
   return 0;
@@ -184,13 +185,14 @@ export function readGLB(file) {
   return { prims, parts, fx };
 }
 
-// Éclairage d'un matériau .obj : lentilles de feux (3–8, d'après l'axe de leur tête), lampes (2), fenêtres (1).
+// Éclairage d'un matériau .obj : lentilles de feux (3–8, d'après l'axe de leur tête), lampes (2), fenêtres (1), façades vitrées (9).
 const OBJ_LENS = /(^|_)fl_(red|green|yel)$/i;
 function objLit(key) {
   const lens = /(?:^|_)fl_(red|green|yel)\|([XY])$/i.exec(key);
   if (lens) return (lens[2] === 'X' ? 3 : 6) + { red: 0, green: 1, yel: 2 }[lens[1].toLowerCase()];
   if (/light|lamp|bulb/i.test(key) && !/pole|post|base/i.test(key)) return 2;
-  if (/(^|_)win$|glass/i.test(key)) return 1;
+  if (/(^|_)win$/i.test(key)) return 1;
+  if (/glass/i.test(key)) return 9; // façade vitrée : éclairage de nuit plus doux
   return 0;
 }
 
