@@ -7,7 +7,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { packModelNames, PROPS, KIT_PROPS } from '../src/core/catalog.js';
+import { packModelNames, PROPS, KIT_PROPS, objScale } from '../src/core/catalog.js';
 import { obfName, obfXor } from '../src/core/obf.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,6 +15,8 @@ export const LANDSCAPE_DIRS = [path.join(ROOT, 'Asset/models'), path.join(ROOT, 
 export const CITY_PACK_DIR = [path.join(ROOT, 'Asset/FULL_VERSION_250_MODELS/GLB'), path.join(ROOT, 'FULL_VERSION_250_MODELS/GLB')].find((d) => fs.existsSync(d)) || path.join(ROOT, 'Asset/FULL_VERSION_250_MODELS/GLB');
 export const PROPS_DIR = path.join(ROOT, 'Asset/Maison/obj free city pack');
 export const ROAD_KIT_DIR = path.join(ROOT, 'Asset/Maison/road/PLUS/gltf');
+export const NEW_MODELS_DIR = path.join(ROOT, 'Asset/export_obj');
+export const NEW_VARIANTS_DIR = path.join(ROOT, 'Asset/export_obj_variantes');
 
 // --- Décodeur PNG minimal (8 bits, non entrelacé : gris, RGB, palette, RGBA)
 export function decodePNG(buf) {
@@ -228,7 +230,7 @@ export function readOBJ(file, scale = 1) {
 
 // --- Un pack = plusieurs modèles partageant une palette, sérialisés dans un seul binaire gzip.
 class PackWriter {
-  constructor() { this.palette = []; this.paletteIndex = new Map(); this.chunks = []; this.size = 0; this.models = {}; }
+  constructor() { this.palette = []; this.paletteIndex = new Map(); this.chunks = []; this.size = 0; this.models = {}; this.seen = new Map(); }
   // role : matériau recolorable du pack (0 aucun, 1–3 murs, 4 toit, 5 boiseries, 6 accent)
   color(r, g, b, lit, role = 0) {
     const key = `${r},${g},${b},${lit},${role}`;
@@ -236,9 +238,13 @@ class PackWriter {
     if (k === undefined) { k = this.palette.length; this.palette.push(role ? [r, g, b, lit, role] : [r, g, b, lit]); this.paletteIndex.set(key, k); }
     return k;
   }
+  // un bloc identique (géométrie partagée par des variantes de couleur) n'est stocké qu'une fois
   push(typed) {
     const bytes = new Uint8Array(typed.buffer, typed.byteOffset, typed.byteLength);
+    const key = crypto.createHash('sha1').update(bytes).digest('base64') + ':' + bytes.length;
+    if (this.seen.has(key)) return this.seen.get(key);
     const off = this.size;
+    this.seen.set(key, off);
     this.chunks.push(bytes);
     this.size += bytes.length;
     const pad = (4 - (this.size % 4)) % 4;
@@ -345,7 +351,25 @@ export function packCity({ dir = CITY_PACK_DIR } = {}) {
   }
   const missing = [];
   for (const name of packModelNames()) {
-    if (!index.has(name)) { missing.push(name); continue; }
+    if (!index.has(name)) {
+      // nouvelles familles en .obj (Asset/export_obj)
+      const obj = path.join(NEW_MODELS_DIR, name + '.obj');
+      if (!fs.existsSync(obj)) { missing.push(name); continue; }
+      w.add(name, obj, objScale(name));
+      // variantes : « Residential_L3_variant.obj », « Residential_L3_variant2.obj », « Residential_L3 variant.obj »…
+      // (dans Asset/export_obj ou Asset/export_obj_variantes : « …_V1.obj », « …_variant.obj », « … variant2.obj »)
+      const alts = [];
+      for (const dir of [NEW_MODELS_DIR, NEW_VARIANTS_DIR]) {
+        if (!fs.existsSync(dir)) continue;
+        for (const f of fs.readdirSync(dir).sort()) {
+          const m = /^(.+?)[ _-]?(?:variant[ _-]?\d*|V\d+)\.obj$/i.exec(f);
+          if (m && m[1] === name && !alts.some((a) => a.key === f.slice(0, -4))) alts.push({ key: f.slice(0, -4), file: path.join(dir, f) });
+        }
+      }
+      for (const a of alts) w.add(a.key, a.file, objScale(name));
+      if (alts.length && w.models[name]) w.models[name].alts = alts.map((a) => a.key).filter((k) => w.models[k]);
+      continue;
+    }
     w.add(name, index.get(name));
     // variantes facultatives : Commercial_N2_B.glb, Commercial_N2_C.glb… (même rôle, autre apparence)
     const alts = [...index.keys()].filter((k) => k.length === name.length + 2 && k.startsWith(name + '_') && /^[A-Z]$/.test(k.slice(-1))).sort();

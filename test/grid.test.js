@@ -78,6 +78,9 @@ test('tous les modèles du catalogue existent dans le pack (si le pack est prés
   const dir = [new URL('../Asset/FULL_VERSION_250_MODELS/GLB/', import.meta.url), new URL('../FULL_VERSION_250_MODELS/GLB/', import.meta.url)].find((d) => fs.existsSync(d));
   if (!dir) return t.skip('pack absent');
   const have = new Set(fs.readdirSync(dir).flatMap((c) => { try { return fs.readdirSync(new URL(c + '/', dir)); } catch { return []; } }).map((f) => f.replace(/\.glb$/, '')));
+  // nouvelles familles exportées en .obj
+  const objDir = new URL('../Asset/export_obj/', import.meta.url);
+  if (fs.existsSync(objDir)) for (const f of fs.readdirSync(objDir)) if (f.endsWith('.obj')) have.add(f.slice(0, -4));
   for (const m of packModelNames()) assert.ok(have.has(m), m);
   for (const chain of Object.values(CHAINS)) assert.ok(chain.length >= 5);
 });

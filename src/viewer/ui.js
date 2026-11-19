@@ -265,8 +265,8 @@ export class CityUI {
     if (!prev || prev.at === cur.at) return;
     const { grown, added, removed } = growthDiff(prev, cur);
     const byPath = new Map(a.files.map((f) => [f.path, f]));
-    const fam = (m) => m.replace(/_N\d+$/, '');
-    const stage = (m) => (/_N(\d+)$/.exec(m) || [])[1] || '';
+    const fam = (m) => m.replace(/_[NL]\d+$/, '');
+    const stage = (m) => (/_[NL](\d+)$/.exec(m) || [])[1] || '';
     const events = [
       ...grown.map((g) => ({
         id: byPath.get(g.path).id, type: 'grown',

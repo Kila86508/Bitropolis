@@ -5,24 +5,27 @@
 // complexité), pas de son rang dans le projet. Un fichier ne rétrécit donc pas parce que d'autres grossissent.
 
 const N = (family, from, to) => Array.from({ length: to - from + 1 }, (_, i) => `${family}_N${from + i}`);
+// Nouvelles familles (Asset/export_obj, niveaux L1 à L8)
+const L = (family) => Array.from({ length: 8 }, (_, i) => `${family}_L${i + 1}`);
 
 // Pour varier la ville, chaque type de fichier a plusieurs chaînes possibles [poids, chaîne].
 // Le choix dépend du chemin du fichier : il est stable d'une génération à l'autre (l'évolution reste lisible).
 export const VARIANTS = {
-  townhall:  [[1, N('Townhall', 1, 8)]],
-  tower:     [[5, N('Residential', 1, 8)], [2, N('Office', 1, 6)], [1.3, N('Residential_Block', 1, 8)], [0.8, N('Commercial', 1, 6)]],
-  shop:      [[4, N('Commercial', 1, 6)], [1, N('Theater', 1, 5)], [0.35, N('Opera', 1, 4)], [1, N('Residential', 2, 8)]],
-  bank:      [[3, N('Office', 1, 6)], [1.6, N('Research', 1, 4)], [0.8, N('Residential_Block', 2, 8)]],
+  townhall:  [[1, N('Townhall', 1, 8)], [1, L('TownHall')]],
+  tower:     [[5, N('Residential', 1, 8)], [4, L('Residential')], [2, N('Office', 1, 6)], [1.3, N('Residential_Block', 1, 8)], [0.8, N('Commercial', 1, 6)]],
+  shop:      [[4, N('Commercial', 1, 6)], [3, L('Commercial')], [1, N('Theater', 1, 5)], [0.35, N('Opera', 1, 4)], [1, N('Residential', 2, 8)]],
+  bank:      [[3, N('Office', 1, 6)], [2.5, L('Office')], [1.6, N('Research', 1, 4)], [0.8, N('Residential_Block', 2, 8)]],
   police:    [[4, N('Police', 1, 5)], [0.4, N('Prison', 1, 3)]],
-  fire:      [[3, N('Fire', 1, 5)], [1.3, N('Transit', 1, 4)]],
-  hospital:  [[2, [...N('Clinic', 1, 4), 'Hospital_N3', 'Hospital_N4']], [1, N('Hospital', 1, 4)]],
-  library:   [[2, [...N('Library', 1, 4), 'University_N2', 'University_N4']], [1.6, N('School', 1, 5)], [0.6, N('University', 1, 4)]],
+  fire:      [[3, N('Fire', 1, 5)], [2.5, L('FireStation')], [1.3, N('Transit', 1, 4)]],
+  hospital:  [[2, [...N('Clinic', 1, 4), 'Hospital_N3', 'Hospital_N4']], [2, L('Hospital')], [1, N('Hospital', 1, 4)]],
+  library:   [[2, [...N('Library', 1, 4), 'University_N2', 'University_N4']], [1.2, L('ClockTower')], [1.6, N('School', 1, 5)], [0.6, N('University', 1, 4)]],
   factory:   [[2, [...N('Light_Industry', 1, 5), 'Heavy_Industry_N4', 'Heavy_Industry_N5', 'Industrial_Complex_N5']],
               [1.2, N('Light_Industrial_Complex', 1, 5)], [0.9, N('Heavy_Industry', 1, 5)]],
   power:     [[2, ['Wind_N1', 'Wind_N3', 'Wind_N5', 'Solar_N3', 'Solar_N6', 'Coal_N3', 'Coal_N5', 'Nuclear_N3']],
               [0.8, N('Solar_Complex', 1, 6)], [0.8, N('Wind', 1, 5)]],
   warehouse: [[2, [...N('Water', 1, 5), 'Wastewater_N3', 'Wastewater_N5', 'Recycling_N7']], [1, N('Recycling', 1, 7)], [0.8, N('Wastewater', 1, 5)]],
-  park:      [[3, ['@grove', '@grove2', ...N('Park', 1, 4), 'Park_N6', 'Park_N8']], [1, ['@grove2', 'Park_N1', 'Park_N3', 'Park_N5', 'Park_N7']]]
+  park:      [[3, ['@grove', '@grove2', ...N('Park', 1, 4), 'Park_N6', 'Park_N8']], [1, ['@grove2', 'Park_N1', 'Park_N3', 'Park_N5', 'Park_N7']],
+              [1.5, L('Fountain')], [1, L('Memorial')]]
 };
 // Chaîne principale de chaque type (compatibilité)
 export const CHAINS = Object.fromEntries(Object.entries(VARIANTS).map(([k, v]) => [k, v[0][1]]));
@@ -51,17 +54,22 @@ export const FAMILY_NAMES = {
   Solar: 'Ferme solaire', Coal: 'Centrale à charbon', Nuclear: 'Centrale nucléaire', Water: "Château d'eau",
   Wastewater: "Station d'épuration", Recycling: 'Centre de recyclage', Park: 'Parc', '@grove': 'Bosquet', '@grove2': 'Jardin',
   Residential_Block: 'Îlot résidentiel', Theater: 'Théâtre', Opera: 'Opéra', Research: 'Centre de recherche', Prison: 'Prison',
-  Transit: 'Gare routière', School: 'École', Light_Industrial_Complex: 'Zone artisanale', Solar_Complex: 'Centrale solaire'
+  Transit: 'Gare routière', School: 'École', Light_Industrial_Complex: 'Zone artisanale', Solar_Complex: 'Centrale solaire',
+  ClockTower_L: "Tour de l'horloge", Commercial_L: 'Commerce', FireStation_L: 'Caserne', Fountain_L: 'Fontaine', Hospital_L: 'Hôpital',
+  Memorial_L: 'Mémorial', Office_L: 'Bureaux', Residential_L: 'Résidence', TownHall_L: 'Hôtel de ville'
 };
 
 // Emprise au sol en cases [largeur x, profondeur z] (relevée sur les modèles, façade vers +z).
 const FOOT = {
   Hospital: [2, 1], University: [2, 2], Heavy_Industry: [1, 2], Industrial_Complex: [2, 2], Solar: [1, 2],
   Coal: [2, 1], Nuclear: [2, 2], Wastewater: [1, 2], Recycling: [2, 2], Townhall: [2, 2],
-  Residential_Block: [2, 2], Opera: [2, 2], Prison: [2, 2], Transit: [1, 2], Light_Industrial_Complex: [2, 1], Solar_Complex: [2, 2],
+  Residential_Block: [2, 2], Opera: [2, 2], TownHall_L: [2, 2], Prison: [2, 2], Transit: [1, 2], Light_Industrial_Complex: [2, 1], Solar_Complex: [2, 2],
   Park_N1: [2, 2], Park_N2: [2, 2], Park_N3: [2, 2], Park_N4: [2, 2], Park_N5: [3, 3], Park_N6: [3, 3], Park_N7: [3, 3], Park_N8: [3, 3]
 };
-export function familyOf(model) { return model.startsWith('@') ? model : model.replace(/_N\d+$/, ''); }
+// « Residential_N3 » → « Residential » ; « Residential_L3 » (nouvelles familles) → « Residential_L »
+export function familyOf(model) { return model.startsWith('@') ? model : model.replace(/_N\d+$/, '').replace(/_L\d+$/, '_L'); }
+// Échelle des modèles .obj des nouvelles familles (terrain de 10 × 10 unités → une case ; hôtel de ville sur 2 × 2)
+export function objScale(model) { return /^TownHall_L/.test(model) ? 0.19 : 0.1; }
 export function footprint(model) { return FOOT[model] || FOOT[familyOf(model)] || [1, 1]; }
 
 // Routes : 8 niveaux selon le trafic de dépendances
@@ -126,13 +134,13 @@ export function growthOf(f, points = growthPoints(f)) {
 // « Résidence N3 », « Bosquet »… pour les étiquettes d'évolution
 export function modelLabel(model) {
   const fam = familyOf(model), name = FAMILY_NAMES[fam] || fam;
-  const m = /_N(\d+)$/.exec(model);
+  const m = /_[NL](\d+)$/.exec(model);
   return m ? `${name} N${m[1]}` : name;
 }
 
 // Version du catalogue : à incrémenter quand les chaînes changent (sinon des changements de famille
 // passeraient pour de la croissance au rechargement).
-export const CATALOG_VERSION = 2;
+export const CATALOG_VERSION = 3;
 
 // Instantané compact d'une ville (chemin → [modèle, stade, points]) pour repérer ce qui a grandi.
 export function growthSnapshot(files, at = null) {
