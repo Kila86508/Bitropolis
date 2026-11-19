@@ -195,7 +195,8 @@ export class TrafficSim {
     let room = Infinity;
     if (out && out.length) { const last = out[out.length - 1]; room = last.s * (last.L || this.cell) - last.len / 2; }
     for (const o of j.inside) if (o.exit === car.plan) room -= o.len + 0.6;
-    if (room < car.len + 0.6) return false;
+    // (après une longue attente devant un carrefour vide, on s'engage quand même : évite les blocages en boucle)
+    if (room < car.len + 0.6 && !(car.waitT > 10 && !j.inside.size)) return false;
     if (j.round) return this._mayEnterRound(car, j);
     // trajectoires qui se croisent : on ne partage le carrefour qu'avec son propre flux,
     // ou avec le flux d'en face si personne ne tourne à gauche

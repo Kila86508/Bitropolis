@@ -32,7 +32,9 @@ export const VARIANTS = {
   warehouse: [[2, [...N('Water', 1, 5), 'Wastewater_N3', 'Wastewater_N5', 'Recycling_N7']], [1, N('Recycling', 1, 7)], [0.8, N('Wastewater', 1, 5)],
               [1, L('ParkingA')], [1, L('ParkingB')], [1, L('ParkingC')]],
   park:      [[3, ['@grove', '@grove2', ...N('Park', 1, 4), 'Park_N6', 'Park_N8']], [1, ['@grove2', 'Park_N1', 'Park_N3', 'Park_N5', 'Park_N7']],
-              [1.5, L('Fountain')], [1, L('Memorial')]]
+              [1.5, L('Fountain')], [1, L('Memorial')],
+              // jardins naturels : parc, jardin, aire de jeux
+              [1.6, L('Parc')], [1.4, L('Jardin')], [1.2, L('AireJeux')]]
 };
 // Chaîne principale de chaque type (compatibilité)
 export const CHAINS = Object.fromEntries(Object.entries(VARIANTS).map(([k, v]) => [k, v[0][1]]));
@@ -66,6 +68,7 @@ export const FAMILY_NAMES = {
   Memorial_L: 'Mémorial', Office_L: 'Bureaux', Residential_L: 'Résidence', TownHall_L: 'Hôtel de ville',
   Banque_L: 'Banque', Centrale_L: 'Centrale électrique', Cinema_L: 'Cinéma', Ecole_L: 'École', Eglise_L: 'Église', Gare_L: 'Gare',
   Hotel_L: 'Hôtel', ParkingA_L: 'Parking', ParkingB_L: 'Parking', ParkingC_L: 'Parking', Police_L: 'Commissariat', Restaurant_L: 'Restaurant',
+  Parc_L: 'Parc', Jardin_L: 'Jardin', AireJeux_L: 'Aire de jeux',
   Usine_Acier_L: 'Aciérie', Usine_Bois_L: 'Scierie', Usine_Chimie_L: 'Usine chimique', Usine_Tech_L: 'Usine high-tech', Usine_Textile_L: 'Usine textile',
   TourAiguille_L: 'Tour Aiguille', TourArche_L: 'Tour Arche', TourBoucle_L: 'Tour Boucle', TourDeco_L: 'Tour Déco', TourEclat_L: 'Tour Éclat', TourHyper_L: 'Tour Hyper', TourJumelles_L: 'Tours jumelles', TourOeuf_L: 'Tour Œuf', TourPagode_L: 'Tour Pagode', TourTorsade_L: 'Tour Torsade', TourTubes_L: 'Tour Tubes'
 };
@@ -108,6 +111,8 @@ const KIT_ROT = Object.fromEntries(Object.entries(KIT_SHAPES).map(([shape, kit])
   const want = kitMask(PACK_EXITS[shape], 0);
   return [shape, [0, 1, 2, 3].find((k) => kitMask(KIT_EXITS[kit], k) === want)];
 }));
+// Jardins naturels (premiers niveaux) posés sur des cases vertes libres pour habiller les espaces vides (kit)
+export const KIT_GARDENS = ['Parc_L1', 'Parc_L2', 'Parc_L3', 'Jardin_L1', 'Jardin_L2', 'Jardin_L3', 'AireJeux_L1', 'AireJeux_L2'];
 // Hauteurs (fraction de case) : tablier des ponts, rampes et passages supérieurs ; petit pont en bois des chemins
 export const ROAD_KIT_DECK = 0.26, ROAD_KIT_DECK_WOOD = 0.05;
 // rampe du kit : côté haut au nord (-z) à rotation nulle → rotation pour que le côté haut regarde `up`
@@ -208,7 +213,7 @@ export function modelLabel(model) {
 
 // Version du catalogue : à incrémenter quand les chaînes changent (sinon des changements de famille
 // passeraient pour de la croissance au rechargement).
-export const CATALOG_VERSION = 4;
+export const CATALOG_VERSION = 5;
 
 // Instantané compact d'une ville (chemin → [modèle, stade, points]) pour repérer ce qui a grandi.
 export function growthSnapshot(files, at = null) {

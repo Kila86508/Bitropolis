@@ -4,7 +4,7 @@
 // les avenues les plus empruntées montent jusqu'au niveau N8.
 import { makeRng } from './rules.js';
 import { buildTree } from './layout.js';
-import { growthOf, footprint, MONUMENTS, ROAD_TIERS, TREES, VEHICLES } from './catalog.js';
+import { growthOf, footprint, MONUMENTS, ROAD_TIERS, TREES, VEHICLES, KIT_GARDENS } from './catalog.js';
 
 export const CELL = 4; // une case du pack = 4 m
 const MAX_LEAF_W = 16;
@@ -135,6 +135,14 @@ const GD_ROADS = (() => {
   }
   return t;
 })();
+
+// Bruit doux (valeurs aléatoires interpolées sur une grille de `size` cases) : regroupe les jardins en parcs
+function gdNoise(x, z, size, seed) {
+  const h = (i, j) => { let v = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(seed, 2246822519); v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; };
+  const fx = x / size, fz = z / size, i = Math.floor(fx), j = Math.floor(fz), u = fx - i, w = fz - j;
+  const su = u * u * (3 - 2 * u), sw = w * w * (3 - 2 * w);
+  return (h(i, j) * (1 - su) + h(i + 1, j) * su) * (1 - sw) + (h(i, j + 1) * (1 - su) + h(i + 1, j + 1) * su) * sw;
+}
 
 // Rivière (kit de voirie) : trois rangées insérées en travers de la ville — berge, eau, berge.
 // La rangée est choisie entre deux îlots (aucun bâtiment coupé), de préférence le long d'une route (quai)
@@ -479,6 +487,12 @@ export function layoutGrid(analysis, opts = {}) {
     let road = -1;
     GD_DIRS.forEach(([dx, dz], i) => { if (road < 0 && isRoad(g.cx + dx, g.cz + dz)) road = i; });
     const r = rng();
+    // kit : jardins naturels (parc, jardin, aire de jeux) regroupés en parcs d'un seul tenant, tournés vers la rue
+    if (opts.kit && gdNoise(g.cx, g.cz, 4.5, files.length) > (road >= 0 ? 0.68 : 0.56)) {
+      const face = road < 0 ? Math.floor(rng() * 4) * (Math.PI / 2) : [Math.PI / 2, -Math.PI / 2, 0, Math.PI][road];
+      put(KIT_GARDENS[Math.floor(rng() * KIT_GARDENS.length)], g.x, g.z, face, 1);
+      continue;
+    }
     if (road >= 0) {
       const [dx, dz] = GD_DIRS[road];
       const edgeX = g.x + dx * CELL * 0.32, edgeZ = g.z + dz * CELL * 0.32;      // bord côté route
