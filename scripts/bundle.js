@@ -24,6 +24,7 @@ const MODULES = [
   'src/viewer/citypack.js',
   'src/viewer/traffic.js',
   'src/viewer/render.js',
+  'src/viewer/export.js',
   'src/viewer/ui.js',
   'src/viewer/main.js'
 ];

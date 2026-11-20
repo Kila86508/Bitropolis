@@ -490,7 +490,7 @@ export function layoutGrid(analysis, opts = {}) {
     GD_DIRS.forEach(([dx, dz], i) => { if (road < 0 && isRoad(g.cx + dx, g.cz + dz)) road = i; });
     const r = rng();
     // kit : jardins naturels (parc, jardin, aire de jeux) regroupés en parcs d'un seul tenant, tournés vers la rue
-    if (opts.kit && gdNoise(g.cx, g.cz, 4.5, files.length) > (road >= 0 ? 0.68 : 0.56)) {
+    if (opts.kit && gdNoise(g.cx, g.cz, 4.5, files.length) > (road >= 0 ? 0.76 : 0.66)) {
       const face = road < 0 ? Math.floor(rng() * 4) * (Math.PI / 2) : [Math.PI / 2, -Math.PI / 2, 0, Math.PI][road];
       put(KIT_GARDENS[Math.floor(rng() * KIT_GARDENS.length)], g.x, g.z, face, 1);
       continue;

@@ -10,6 +10,7 @@ import { packReady, packModel, setPackOverlay, overlayActive } from './assets.js
 import { buildPackCity, buildPackVehicles, makePackMaterial, CITY_Y } from './citypack.js';
 import { TrafficSim } from './traffic.js';
 import { tp } from './i18n.js';
+import { HEALTH } from '../core/analyze.js';
 
 const BASE_Y = 0.32; // hauteur des parcelles (trottoir + dalle)
 
@@ -140,7 +141,7 @@ export class CityRenderer {
     this.dayCycle = { on: true, clock: 0, day: 120, night: 120, fade: 10 };
     this.onNightChange = null;
     this._fastFade = false;
-    this.state = { traffic: true, deps: false, labels: true };
+    this.state = { traffic: true, deps: false, labels: true, health: false };
     this.raycaster = new THREE.Raycaster();
     this.lib = rdGeoLib();
 
@@ -197,6 +198,7 @@ export class CityRenderer {
     this.animParts = [];
     this.traffic = null;
     this.lod = null;
+    this.healthGroup = null;
   }
 
   load(analysis, themeId = 'lowpoly') {
@@ -404,6 +406,7 @@ export class CityRenderer {
       if (this.onNightChange) this.onNightChange(false);
     }
     this._applyNight(true);
+    if (this.state.health) this.setHealth(true);
     this.buildMs = Math.round(performance.now() - t0);
     return city;
   }
@@ -747,6 +750,110 @@ export class CityRenderer {
     g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.45, depthWrite: false }));
     this.depGroup.add(lines);
+  }
+
+  // --- Santé du code : une icône au-dessus de chaque bâtiment à problème, les boucles d'imports en rouge
+  setHealth(on) {
+    this.state.health = on;
+    if (on && !this.healthGroup && this.root) this._buildHealth();
+    if (this.healthGroup) this.healthGroup.visible = on;
+  }
+  _iconSprite(text) {
+    this._iconMats = this._iconMats || new Map();
+    let mat = this._iconMats.get(text);
+    if (!mat) {
+      const c = document.createElement('canvas'), ctx = c.getContext('2d');
+      const n = [...text].length;
+      c.width = 40 + 76 * n; c.height = 112;
+      ctx.fillStyle = 'rgba(16,22,38,0.82)';
+      ctx.beginPath(); ctx.roundRect(4, 4, c.width - 8, c.height - 8, 50); ctx.fill();
+      ctx.strokeStyle = '#ff5a5f'; ctx.lineWidth = 6; ctx.stroke();
+      ctx.font = '64px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+      [...text].forEach((ch, i) => ctx.fillText(ch, 20 + 38 + 76 * i, c.height / 2 + 4));
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      // taille constante à l'écran : lisibles de loin comme de près
+      mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false });
+      mat.userData.aspect = c.width / c.height;
+      this._iconMats.set(text, mat);
+    }
+    const sp = new THREE.Sprite(mat);
+    sp.renderOrder = 21;
+    return sp;
+  }
+  _buildHealth() {
+    const g = (this.healthGroup = new THREE.Group());
+    this.root.add(g);
+    const files = this.analysis.files;
+    const icons = [[HEALTH.CYCLE, '🔄'], [HEALTH.HUGE, '🔥'], [HEALTH.COMPLEX, '🌀'], [HEALTH.TODO, '🚧'], [HEALTH.ORPHAN, '👻']];
+    const size = 0.07; // hauteur de l'icône (fraction de la hauteur de l'écran)
+    for (const f of files) {
+      const b = this.buildings[f.id];
+      if (!f.h || !b) continue;
+      const text = icons.filter(([bit]) => f.h & bit).map(([, ic]) => ic).slice(0, 3).join('');
+      const sp = this._iconSprite(text);
+      sp.scale.set(size * sp.material.userData.aspect * 0.5, size * 0.5, 1);
+      sp.position.set(b.lot.x, b.box.max.y + 1.2, b.lot.z);
+      sp.userData.fileId = f.id;
+      g.add(sp);
+    }
+    // boucles d'imports : arcs rouges entre les fichiers d'une même boucle
+    const pts = [];
+    for (const grp of (this.analysis.health && this.analysis.health.cycles) || []) {
+      const inGrp = new Set(grp);
+      for (const id of grp) {
+        const a = this.buildings[id];
+        if (!a) continue;
+        for (const t of files[id].imports) {
+          if (!inGrp.has(t) || !this.buildings[t]) continue;
+          const P = this._arc(a, this.buildings[t]).getPoints(16);
+          for (let i = 0; i < P.length - 1; i++) pts.push(P[i].x, P[i].y, P[i].z, P[i + 1].x, P[i + 1].y, P[i + 1].z);
+        }
+      }
+    }
+    if (pts.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      g.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: '#ff3b47', transparent: true, opacity: 0.9, depthWrite: false })));
+    }
+  }
+
+  // --- Timelapse : les bâtiments sortent de terre un à un, de l'hôtel de ville vers la périphérie
+  startTimelapse(duration = 9) {
+    if (!this.usePack || !this.buildings) return 0;
+    const hall = this.analysis.files.find((f) => f.kind === 'townhall');
+    const c = hall && this.buildings[hall.id] ? this.buildings[hall.id].lot : { x: 0, z: 0 };
+    const list = this.buildings.filter((b) => b && b.ref).map((b) => ({ b, d: Math.hypot(b.lot.x - c.x, b.lot.z - c.z) })).sort((a, b) => a.d - b.d);
+    this.growAnims = [];
+    list.forEach(({ b }, i) => {
+      const mesh = this.packMeshes.get(b.ref.model);
+      if (!mesh) return;
+      const start = 0.4 + (duration * i) / list.length;
+      const a = { b, mesh, index: b.ref.index, x: b.lot.x, z: b.lot.z, ry: b.ry, mirror: !!b.mirror, t: -start, start, from: 0.02 };
+      this.growAnims.push(a);
+      this._growApply(a, 0);
+    });
+    this._tl = { starts: this.growAnims.map((a) => a.start), built: 0 };
+    return this.growAnims.length;
+  }
+  // Position du timelapse à l'instant s (secondes, horloge réelle) : indépendant du nombre d'images par seconde
+  timelapseAt(s) {
+    if (!this._tl) return;
+    for (const a of this.growAnims || []) if (a.start !== undefined) { a.t = s - a.start; this._growApply(a, a.t / 1.1); }
+    this._tl.built = this._tl.starts.filter((st) => s > st).length;
+  }
+  timelapseBuilt() { return this._tl ? this._tl.built : 0; }
+  // Image de la vue actuelle, recadrée au format w × h, dessinée dans ctx (export GIF / vidéo)
+  drawView(ctx, w, h, render = true) {
+    if (render) {
+      if (this.lod) this.lod.update(this.camera);
+      this.renderer.render(this.scene, this.camera);
+    }
+    const src = this.renderer.domElement, sw = src.width, sh = src.height, ratio = w / h;
+    let cw = sw, ch = sw / ratio;
+    if (ch > sh) { ch = sh; cw = sh * ratio; }
+    ctx.drawImage(src, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h);
   }
 
   _arc(a, b) {

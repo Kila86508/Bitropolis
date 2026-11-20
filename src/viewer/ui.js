@@ -1,10 +1,11 @@
 // Bitropolis — interface : panneaux, recherche, légende, ouverture de dossier locale.
-import { KINDS, analyzeProjectAsync } from '../core/analyze.js';
+import { KINDS, HEALTH, analyzeProjectAsync } from '../core/analyze.js';
 import { shouldSkipDir, shouldSkipFile, shouldReadContent, makeIgnoreMatcher, selectFiles, SCAN_LIMIT } from '../core/rules.js';
 import { UPCOMING_THEMES, availableThemes, defaultThemeId } from './themes/index.js';
 import { hasLandscapeAssets } from './landscape.js';
 import { assetsReady } from './assets.js';
 import { growthSnapshot, growthDiff } from '../core/catalog.js';
+import { gifPalette, GifEncoder, videoFormat, downloadBlob } from './export.js';
 import { t, tp, fmtNum, fmtBytes, kindLabel, kindRole, famName, modelName, applyI18n, getLang, setLang, UI_LANGS } from './i18n.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -157,6 +158,8 @@ export class CityUI {
     toggle($('#btn-deps'), (on) => e.setDeps(on));
     toggle($('#btn-traffic'), (on) => e.setTraffic(on));
     toggle($('#btn-labels'), (on) => e.setLabels(on));
+    // santé du code : icônes dans la ville + rapport dans le panneau
+    toggle($('#btn-health'), (on) => { e.setHealth(on); if (on) this._healthReport(); else if (this._healthOpen) this.select(null); });
     $('#btn-home').addEventListener('click', () => e.resetView());
     const landBtn = $('#btn-land');
     if (!hasLandscapeAssets()) landBtn.hidden = true;
@@ -168,12 +171,18 @@ export class CityUI {
       uiSaveLandSeed(name, ev.shiftKey ? null : seed);
       if (plan) this.toast(ev.shiftKey ? t('toast.land.orig') : t('toast.land.new', { n: uiNum(plan.stats.objects) }));
     });
-    $('#btn-shot').addEventListener('click', () => {
-      const a = document.createElement('a');
-      a.href = e.screenshot();
-      a.download = `bitropolis-${(this.analysis?.name || 'ville').replace(/[^\w-]+/g, '_')}.png`;
-      a.click();
+    // export : menu image / GIF / vidéo
+    const menu = $('#export-menu');
+    $('#btn-shot').addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if (!menu.hidden) { menu.hidden = true; return; }
+      const r = $('#btn-shot').getBoundingClientRect();
+      menu.style.left = `${Math.max(8, Math.min(window.innerWidth - 240, r.left - 90))}px`;
+      menu.style.top = `${r.bottom + 8}px`;
+      menu.hidden = false;
     });
+    document.addEventListener('click', (ev) => { if (!ev.target.closest('#export-menu')) menu.hidden = true; });
+    menu.addEventListener('click', (ev) => { const b = ev.target.closest('[data-export]'); if (!b) return; menu.hidden = true; this._export(b.dataset.export); });
     $('#btn-open').addEventListener('click', () => $('#folder-input').click());
     $('#welcome-open').addEventListener('click', () => $('#folder-input').click());
     $('#folder-input').addEventListener('change', async (ev) => {
@@ -381,8 +390,9 @@ export class CityUI {
     this.engine.select(id);
     const panel = $('#panel');
     if (id == null) { panel.classList.remove('open'); return; }
+    this._healthOpen = false;
     const a = this.analysis, f = a.files[id], k = KINDS[f.kind];
-    const link = (j) => { const g = a.files[j]; return `<button class="dep" data-goto="${j}"><span>${KINDS[g.kind].icon}</span>${uiEsc(g.name)}<small>${uiEsc(g.dir || '/')}</small></button>`; };
+    const link = (j) => this._fileLink(j);
     const metrics = [
       [t('m.loc'), uiNum(f.loc)], [t('m.size'), uiBytes(f.size)], [t('m.funcs'), uiNum(f.funcs)],
       [t('m.classes'), uiNum(f.classes)], [t('m.branches'), uiNum(f.branches)], [t('m.todos'), uiNum(f.todos)],
@@ -393,12 +403,146 @@ export class CityUI {
       <h2>${uiEsc(f.name)}</h2>
       <div class="path">${uiEsc(f.path)}</div>
       ${this._growthHTML(f)}
+      ${this._warnHTML(f)}
       <div class="metrics">${metrics.map(([l, v]) => `<div><small>${l}</small><b>${v}</b></div>`).join('')}</div>
       <h3><i class="dot out"></i>${t('p.uses')} <em>${f.imports.length}</em></h3>
       <div class="deps">${f.imports.map(link).join('') || `<p class="none">${uiEsc(t('p.noDeps'))}</p>`}</div>
       <h3><i class="dot in"></i>${t('p.usedBy')} <em>${f.importedBy.length}</em></h3>
       <div class="deps">${f.importedBy.map(link).join('') || `<p class="none">${uiEsc(t('p.noUsers'))}</p>`}</div>`;
     panel.classList.add('open');
+  }
+
+  _fileLink(j) {
+    const g = this.analysis.files[j];
+    return `<button class="dep" data-goto="${j}"><span>${KINDS[g.kind].icon}</span>${uiEsc(g.name)}<small>${uiEsc(g.dir || '/')}</small></button>`;
+  }
+
+  // Alertes de santé d'un fichier (fiche du bâtiment)
+  _warnHTML(f) {
+    if (!f.h) return '';
+    const w = [];
+    if (f.h & HEALTH.HUGE) w.push(`🔥 ${t('w.huge', { n: uiNum(f.loc) })}`);
+    if (f.h & HEALTH.CYCLE) w.push(`🔄 ${t('w.cycle')}`);
+    if (f.h & HEALTH.COMPLEX) w.push(`🌀 ${t('w.complex', { n: uiNum(f.branches) })}`);
+    if (f.h & HEALTH.TODO) w.push(`🚧 ${t('w.todo', { n: uiNum(f.todos) })}`);
+    if (f.h & HEALTH.ORPHAN) w.push(`👻 ${t('w.orphan')}`);
+    return `<div class="warn">${w.map((x) => `<span>${uiEsc(x)}</span>`).join('')}</div>`;
+  }
+
+  // Rapport « santé du code » : ce qui mérite un coup d'œil, avec des liens vers les bâtiments
+  _healthReport() {
+    const a = this.analysis, H = a && a.health;
+    if (!H) return;
+    this.engine.select(null);
+    const files = a.files;
+    const top = (bit, key) => files.filter((f) => f.h & bit).sort((x, y) => y[key] - x[key]);
+    const section = (icon, label, list) => {
+      if (!list.length) return '';
+      const more = list.length > 6 ? `<p class="health-more">${uiEsc(t('health.more', { n: uiNum(list.length - 6) }))}</p>` : '';
+      return `<h3>${icon} ${uiEsc(t(label))} <em>${uiNum(list.length)}</em></h3><div class="deps">${list.slice(0, 6).map((f) => this._fileLink(f.id)).join('')}</div>${more}`;
+    };
+    let cycles = '';
+    if (H.cycleGroups) {
+      cycles = `<h3>🔄 ${uiEsc(t('health.cycle'))} <em>${uiNum(H.cycleGroups)}</em></h3>` +
+        H.cycles.slice(0, 3).map((g) => `<p class="health-more">${uiEsc(t('health.loop', { n: uiNum(g.length) }))}</p><div class="deps">${g.slice(0, 5).map((j) => this._fileLink(j)).join('')}</div>`).join('');
+    }
+    const body = section('🔥', 'health.huge', top(HEALTH.HUGE, 'loc')) + cycles +
+      section('🌀', 'health.complex', top(HEALTH.COMPLEX, 'branches')) + section('🚧', 'health.todo', top(HEALTH.TODO, 'todos')) +
+      section('👻', 'health.orphan', top(HEALTH.ORPHAN, 'loc'));
+    $('#panel-body').innerHTML = `
+      <div class="kind">${t('health.title')}<small>${uiEsc(t('health.sub'))}</small></div>
+      ${body || `<p class="none">${uiEsc(t('health.none'))}</p>`}`;
+    $('#panel').classList.add('open');
+    this._healthOpen = true;
+  }
+
+  // --- Export : image PNG, GIF animé (tour complet), vidéo timelapse de la construction
+  async _export(kind) {
+    if (!this.analysis || this._exporting) return;
+    const name = (this.analysis.name || 'ville').replace(/[^\w-]+/g, '_');
+    if (kind === 'png') { downloadBlob(await (await fetch(this.engine.screenshot())).blob(), `bitropolis-${name}.png`); return; }
+    this._exporting = true;
+    try {
+      if (kind === 'gif') await this._exportGif(name);
+      else await this._exportVideo(name);
+    } catch (err) {
+      console.error(err);
+      this.toast(t('export.fail', { msg: err.message }));
+    }
+    this._exporting = false;
+    this._loading(null);
+  }
+  // Signature discrète en bas à gauche des exports
+  _stamp(ctx, W, H, extra = '') {
+    const text = `🏙️ Bitropolis · ${this.analysis.name}${extra}`;
+    ctx.font = `600 ${Math.round(H * 0.035)}px system-ui, sans-serif`;
+    const w = ctx.measureText(text).width + H * 0.05, h = H * 0.065;
+    ctx.fillStyle = 'rgba(16,22,38,0.72)';
+    ctx.beginPath(); ctx.roundRect(H * 0.03, H - h - H * 0.03, w, h, h / 2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, H * 0.055, H - H * 0.03 - h / 2);
+  }
+  async _exportGif(name) {
+    const e = this.engine, c = e.controls, W = 512, H = 288, N = 40;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    const auto = c.autoRotate, theta0 = c.goal.theta, frames = [];
+    c.autoRotate = false;
+    for (let i = 0; i < N; i++) {
+      c.theta = c.goal.theta = theta0 + (2 * Math.PI * i) / N;
+      c.update(0.016);
+      e.drawView(ctx, W, H);
+      this._stamp(ctx, W, H);
+      frames.push(ctx.getImageData(0, 0, W, H).data);
+      this._loading(t('export.gifFrames', { i: i + 1, n: N }), ((i + 1) / N) * 0.6);
+      await uiYield();
+    }
+    c.theta = c.goal.theta = theta0; c.autoRotate = auto;
+    this._loading(t('export.gifEncode'), 0.62);
+    await uiYield();
+    const samples = [];
+    for (let f = 0; f < N; f += 4) for (let i = 0; i < frames[f].length; i += 4 * 53) samples.push(frames[f][i], frames[f][i + 1], frames[f][i + 2]);
+    const enc = new GifEncoder(W, H, gifPalette(Uint8Array.from(samples)), 8);
+    for (let i = 0; i < N; i++) {
+      enc.addFrame(frames[i]);
+      if (i % 4 === 3) { this._loading(t('export.gifEncode'), 0.62 + (0.38 * (i + 1)) / N); await uiYield(); }
+    }
+    const file = `bitropolis-${name}.gif`;
+    downloadBlob(new Blob([enc.finish()], { type: 'image/gif' }), file);
+    this.toast(t('export.done', { file }));
+  }
+  async _exportVideo(name) {
+    const fmt = videoFormat();
+    if (!fmt) { this.toast(t('export.noVideo')); return; }
+    const e = this.engine, c = e.controls, W = 1280, H = 720, DUR = 10, TAIL = 2.5;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const rec = new MediaRecorder(cv.captureStream(30), { mimeType: fmt.type, videoBitsPerSecond: 5e6 });
+    const chunks = [];
+    rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+    const total = e.startTimelapse(DUR);
+    const auto = c.autoRotate;
+    c.autoRotate = false;
+    e.drawView(ctx, W, H);
+    rec.start(250);
+    const t0 = performance.now();
+    await new Promise((resolve) => {
+      const step = () => {
+        const s = (performance.now() - t0) / 1000;
+        c.goal.theta += 0.0035; // la caméra tourne doucement autour de la ville
+        e.timelapseAt(s);
+        e.drawView(ctx, W, H);
+        this._stamp(ctx, W, H, ` · ${uiNum(Math.min(total, e.timelapseBuilt()))} / ${uiNum(total)} 🏢`);
+        this._loading(t('export.recording', { s: Math.max(0, Math.ceil(DUR + TAIL - s)) }), Math.min(1, s / (DUR + TAIL)));
+        if (s < DUR + TAIL) requestAnimationFrame(step); else resolve();
+      };
+      requestAnimationFrame(step);
+    });
+    await new Promise((r) => { rec.onstop = r; rec.stop(); });
+    c.autoRotate = auto;
+    const file = `bitropolis-${name}-timelapse.${fmt.ext}`;
+    downloadBlob(new Blob(chunks, { type: fmt.type.split(';')[0] }), file);
+    this.toast(t('export.done', { file }));
   }
 
   _growthHTML(f) {
@@ -417,6 +561,7 @@ export class CityUI {
 
   _showRoundabout(i) {
     this.engine.select(null);
+    this._healthOpen = false;
     const r = this.engine.roundabouts[i];
     if (this.engine.city.grid) {
       $('#panel-body').innerHTML = `

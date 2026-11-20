@@ -15,7 +15,7 @@ Plus un fichier grossit, plus son bâtiment monte en gamme.
 [![npm](https://img.shields.io/npm/v/bitropolis?style=for-the-badge&color=cb3837)](https://www.npmjs.com/package/bitropolis)
 [![Licence MIT](https://img.shields.io/badge/code-MIT-6d7178?style=for-the-badge)](LICENSE)
 
-![Bitropolis : une ville 3D générée à partir d'un projet de code](docs/hero.jpg)
+![Timelapse : la ville du noyau Linux sort de terre, 4 000 bâtiments](docs/linux-timelapse.gif)
 
 </div>
 
@@ -26,6 +26,8 @@ Plus un fichier grossit, plus son bâtiment monte en gamme.
 - 📈 **Elle évolue avec ton code** : à chaque nouvelle génération, les fichiers qui ont grandi font monter leur bâtiment, sous tes yeux.
 - 🌄 **Une carte unique par projet** : campagne procédurale (collines, lacs, forêts) posée sur un socle de diorama.
 - 🔒 **100 % local** : un seul fichier HTML, aucune requête réseau, pas une ligne de ton code copiée.
+- 🩺 **Un vrai outil** : le mode Santé repère les fichiers géants, les boucles d'imports, le code mort, les TODO accumulés.
+- 🎬 **À partager** : exporte ta ville en image, en GIF animé ou en vidéo timelapse de sa construction.
 
 ## 🗺️ Le principe
 
@@ -54,21 +56,41 @@ Plus un fichier grossit, plus son bâtiment monte en gamme.
 | 💧 **Château d'eau → station d'épuration** | Données brutes : SQL, CSV, migrations |
 | 🌳 **Parc, fontaine, mémorial** | Les assets : images, sons, polices |
 
-## 📸 Galerie
+## 🏙️ Villes célèbres
+
+Quelques grands projets open source, tels que Bitropolis les voit.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/traffic.jpg" alt="Circulation : pont sur la rivière, carrefour à feux"><br><sub><b>🚦 Circulation</b> : les voitures roulent à droite, montent sur les ponts, s'arrêtent aux feux et cèdent le passage dans les ronds-points.</sub></td>
-    <td width="50%"><img src="docs/night.jpg" alt="La ville de nuit"><br><sub><b>🌙 La nuit</b> : les lampadaires s'allument, les fenêtres s'allument et s'éteignent étage par étage.</sub></td>
+    <td width="50%"><img src="docs/react.jpg" alt="La ville de React"><br><sub><b>⚛️ React</b> : une ville de commissariats. Ses milliers de tests deviennent des quartiers entiers.</sub></td>
+    <td width="50%"><img src="docs/cyberpunk.jpg" alt="La ville de VS Code en thème Cyberpunk"><br><sub><b>🌃 VS Code</b>, en thème Cyberpunk : 21 600 fichiers, 22 660 liaisons.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/evolution.jpg" alt="Évolution : étiquettes Résidence N2 → N3"><br><sub><b>📈 Évolution</b> : ce qui a grandi depuis la dernière génération sort de terre, avec son nouveau stade.</sub></td>
-    <td width="50%"><img src="docs/focus.jpg" alt="Un fichier sélectionné et ses dépendances"><br><sub><b>🔗 Dépendances</b> : clique un bâtiment pour voir ce qu'il utilise (orange) et qui l'utilise (bleu).</sub></td>
+    <td width="50%"><img src="docs/cpython.jpg" alt="La ville de CPython de nuit"><br><sub><b>🐍 CPython</b>, de nuit : <code>Modules</code>, <code>Objects</code>, <code>Lib</code>…</sub></td>
+    <td width="50%"><img src="docs/rust.jpg" alt="La ville de Rust"><br><sub><b>🦀 Rust</b> : le quartier <code>compiler</code> forme un vrai centre d'affaires.</sub></td>
   </tr>
 </table>
 
-![Le diorama entier : la ville au centre, la campagne, les lacs et la rivière](docs/diorama.jpg)
-<p align="center"><sub><b>🌄 Le diorama</b> : chaque projet a sa propre campagne, tirée de son nom. Le bouton 🎲 en tire une autre.</sub></p>
+Pour les voir chez toi (clone léger de la dernière version, puis la ville) :
+
+```bash
+git clone --depth 1 https://github.com/facebook/react.git
+npx bitropolis react
+
+git clone --depth 1 https://github.com/microsoft/vscode.git
+npx bitropolis vscode
+
+git clone --depth 1 https://github.com/python/cpython.git
+npx bitropolis cpython
+
+git clone --depth 1 https://github.com/rust-lang/rust.git
+npx bitropolis rust
+
+git clone --depth 1 https://github.com/torvalds/linux.git
+npx bitropolis linux
+```
+
+> Chaque ville se construit en 1 à 12 secondes et garde 4 000 bâtiments représentatifs, quel que soit le nombre de fichiers.
 
 ## 🏗️ Une ville qui grandit avec ton code
 
@@ -124,7 +146,7 @@ Le fichier généré est **autonome** : envoie-le à un ami, il s'ouvre sans ser
 | Chercher un fichier | `/` |
 | Désélectionner | `Échap` |
 
-Barre d'outils : 🌙 jour / nuit · 🔗 toutes les liaisons · 🚗 trafic · 🏷️ quartiers · 🎯 recentrer · 🎲 nouvelle campagne · 📸 capture · thème · langue.
+Barre d'outils : 🌙 jour / nuit · 🔗 toutes les liaisons · 🚗 trafic · 🏷️ quartiers · 🎯 recentrer · 🎲 nouvelle campagne · 🩺 santé du code · 📸 export (image, GIF, vidéo) · thème · langue.
 
 > 🌐 L'interface et la CLI parlent **français, anglais, allemand, italien, espagnol, chinois et russe** : la langue du navigateur (ou du système) est choisie automatiquement, et le menu de langue de la barre d'outils permet d'en changer.
 
@@ -148,6 +170,30 @@ git clone --depth 1 https://github.com/torvalds/linux.git
 npx bitropolis linux
 ```
 
+## 🩺 Santé du code
+
+![Le mode Santé sur VS Code : boucles d'imports en rouge, fichiers géants et très complexes signalés](docs/health.jpg)
+
+Le bouton **🩺 Santé** affiche au-dessus des bâtiments ce qui mérite un coup d'œil, et ouvre un rapport où chaque fichier est cliquable :
+
+| Icône | Problème | Règle |
+|---|---|---|
+| 🔥 | Fichier géant | 1 000 lignes de code ou plus |
+| 🔄 | Dépendance circulaire | le fichier fait partie d'une boucle d'imports (arcs rouges dans la ville) |
+| 🌀 | Très complexe | 150 branches ou plus (`if`, `for`, `&&`…) |
+| 🚧 | TODO / FIXME accumulés | 5 ou plus |
+| 👻 | Jamais importé | code peut-être mort (hors points d'entrée, tests, scripts) |
+
+La fiche de chaque bâtiment liste aussi ses alertes. Sur VS Code, Bitropolis trouve par exemple 63 boucles d'imports, dont une de 16 fichiers.
+
+## 🎬 Exporter ta ville
+
+Le bouton **📸** propose trois exports, tous calculés dans ton navigateur :
+
+- 🖼️ **Image PNG** de la vue actuelle ;
+- 🎞️ **GIF animé** : un tour complet de la ville (512 × 288, en boucle) ;
+- 🎬 **Vidéo timelapse** (MP4 ou WebM selon le navigateur) : les bâtiments sortent de terre un à un, de l'hôtel de ville vers la périphérie, pendant que la caméra tourne.
+
 ## 🔒 100 % local, vraiment
 
 - Aucune requête réseau : three.js et les modèles 3D sont **embarqués** dans le HTML. Pas de CDN, pas d'analytics.
@@ -169,7 +215,6 @@ Les liens entre fichiers sont détectés pour **JavaScript / TypeScript** (ESM, 
 
 <p align="center"><img src="docs/cyberpunk.jpg" alt="Le thème Cyberpunk"><br><sub>🌃 Le thème Cyberpunk : la même ville, en néons, de nuit.</sub></p>
 
-<p align="center"><img src="docs/lowpoly.jpg" width="70%" alt="Le thème low poly"><br><sub>Le thème low poly.</sub></p>
 
 Un thème ne touche ni à l'analyse ni au plan de la ville : il décrit seulement à quoi ressemblent les bâtiments. Voir [`docs/THEMES.md`](docs/THEMES.md) pour en créer un.
 
@@ -188,6 +233,7 @@ src/viewer/traffic.js      circulation : voies, distances, feux, priorité à dr
 src/viewer/citypack.js     affichage de la ville (InstancedMesh, palettes, lumières)
 src/viewer/landscape.js    affichage de la campagne et du socle
 src/viewer/ui.js           interface, recherche, glisser-déposer
+src/viewer/export.js       export GIF (encodeur maison) et vidéo timelapse
 scripts/assets.js          conversion des modèles (.glb, .obj) en données compactes chiffrées
 scripts/build.js           construit dist/bitropolis.html
 ```
@@ -208,6 +254,8 @@ npm run build    # régénère dist/bitropolis.html
 - [x] Évolution animée entre deux générations
 - [x] Rivière, ponts, passages supérieurs et ronds-points
 - [x] Très grands projets : sélection représentative, niveaux de détail
+- [x] Santé du code : fichiers géants, boucles d'imports, code mort
+- [x] Export image, GIF animé et vidéo timelapse
 - [ ] Historique Git : voir la ville se construire commit après commit
 - [ ] Mode « visite » à la première personne
 - [ ] Météo selon l'état du projet (TODO, tests qui échouent…)

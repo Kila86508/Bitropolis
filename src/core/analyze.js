@@ -300,6 +300,60 @@ function classify(f) {
 
 const ENTRY_RX = /^(main|index|app|server|program|__main__|manage|cli|application|bootstrap|start|run|entry|lib|mod|game|init)$/i;
 
+// --- Santé du code : un drapeau par problème (champ « h » de chaque fichier, somme des drapeaux)
+export const HEALTH = { HUGE: 1, CYCLE: 2, ORPHAN: 4, TODO: 8, COMPLEX: 16 };
+export const HEALTH_LIMITS = { huge: 1000, todos: 5, branches: 150 };
+// langages dont on résout bien les imports (sinon « jamais importé » serait trompeur : un .c n'est jamais importé)
+const ORPHAN_EXT = new Set(['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'py', 'vue', 'svelte', 'h', 'hh', 'hpp', 'dart', 'rb', 'php', 'lua', 'scss', 'sass', 'less']);
+const ORPHAN_SKIP_DIR = /(^|\/)(test|tests|__tests__|spec|e2e|bin|scripts?|tools?|examples?|samples?|demos?|docs?|benchmarks?|fixtures?|stories|migrations?)(\/|$)/i;
+// Composantes fortement connexes (Tarjan, sans récursion) : chaque groupe de 2 fichiers ou plus est une boucle d'imports
+function importCycles(files) {
+  const n = files.length, index = new Int32Array(n).fill(-1), low = new Int32Array(n), onStack = new Uint8Array(n);
+  const stack = [], groups = [];
+  let counter = 0;
+  for (let root = 0; root < n; root++) {
+    if (index[root] >= 0) continue;
+    const work = [[root, 0]];
+    index[root] = low[root] = counter++; stack.push(root); onStack[root] = 1;
+    while (work.length) {
+      const top = work[work.length - 1], v = top[0], out = files[v].imports;
+      if (top[1] < out.length) {
+        const w = out[top[1]++];
+        if (index[w] < 0) { index[w] = low[w] = counter++; stack.push(w); onStack[w] = 1; work.push([w, 0]); }
+        else if (onStack[w]) low[v] = Math.min(low[v], index[w]);
+      } else {
+        work.pop();
+        if (work.length) { const u = work[work.length - 1][0]; low[u] = Math.min(low[u], low[v]); }
+        if (low[v] === index[v]) {
+          const g = [];
+          let w;
+          do { w = stack.pop(); onStack[w] = 0; g.push(w); } while (w !== v);
+          if (g.length > 1) groups.push(g);
+        }
+      }
+    }
+  }
+  return groups.sort((a, b) => b.length - a.length);
+}
+function healthOf(files) {
+  const cycles = importCycles(files);
+  const inCycle = new Set(cycles.flat());
+  const counts = { huge: 0, cycle: 0, orphan: 0, todo: 0, complex: 0 };
+  for (const f of files) {
+    let h = 0;
+    if (f.isCode && f.loc >= HEALTH_LIMITS.huge) { h |= HEALTH.HUGE; counts.huge++; }
+    if (inCycle.has(f.id)) { h |= HEALTH.CYCLE; counts.cycle++; }
+    if (f.isCode && f.importedBy.length === 0 && ORPHAN_EXT.has(f.ext) && f.kind !== 'townhall' && f.kind !== 'police' &&
+        !ENTRY_RX.test(stripExt(f.name)) && !/\.(test|spec|stories|d)\.[a-z]+$|^(setup|conftest|vite|webpack|rollup|jest|babel|eslint)[.\w]*$/i.test(f.name) && !ORPHAN_SKIP_DIR.test(f.dir) && f.dir) {
+      h |= HEALTH.ORPHAN; counts.orphan++;
+    }
+    if (f.todos >= HEALTH_LIMITS.todos) { h |= HEALTH.TODO; counts.todo++; }
+    if (f.isCode && f.branches >= HEALTH_LIMITS.branches) { h |= HEALTH.COMPLEX; counts.complex++; }
+    f.h = h;
+  }
+  return { ...counts, cycles: cycles.slice(0, 20).map((g) => g.slice(0, 16)), cycleGroups: cycles.length };
+}
+
 // Analyse complète, d'un bloc (CLI, tests).
 export function analyzeProject(rawFiles, options = {}) {
   const it = analyzeSteps(rawFiles, options);
@@ -426,6 +480,7 @@ function* analyzeSteps(rawFiles, options = {}) {
   if (!hall) hall = ranked.find((f) => f.kind !== 'park') || null;
   if (hall) { hall.kind = 'townhall'; hall.tier = 5; }
 
+  const health = healthOf(files);
   const kinds = {};
   for (const f of files) kinds[f.kind] = (kinds[f.kind] || 0) + 1;
   const langs = {};
@@ -437,6 +492,7 @@ function* analyzeSteps(rawFiles, options = {}) {
     name: projectName,
     generatedAt: new Date().toISOString(),
     truncated,
+    health,
     stats: {
       files: n, loc: files.reduce((s, f) => s + f.loc, 0), edges, kinds, langs,
       externals: [...externals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30)
@@ -446,7 +502,7 @@ function* analyzeSteps(rawFiles, options = {}) {
       size: f.size, lines: f.lines, loc: f.loc, funcs: f.funcs, classes: f.classes,
       branches: f.branches, todos: f.todos, external: f.external,
       imports: f.imports, importedBy: f.importedBy,
-      score: Math.round(f.score * 1000) / 1000, tier: f.tier, rank: f.rank, kind: f.kind
+      score: Math.round(f.score * 1000) / 1000, tier: f.tier, rank: f.rank, kind: f.kind, ...(f.h ? { h: f.h } : {})
     }))
   };
 }

@@ -11,11 +11,12 @@ const I18N_LOCALE = { en: 'en-US', fr: 'fr-FR', de: 'de-DE', it: 'it-IT', es: 'e
 const I18N_D = {};
 
 I18N_D.en = {
+  'btn.health.t': 'Code health: huge files, import cycles, dead code…', 'btn.health.l': ' Health', 'export.png': 'Image (PNG)', 'export.gif': 'Animated GIF (full turn)', 'export.video': 'Timelapse video (construction)', 'export.gifFrames': 'GIF: frame {i}/{n}', 'export.gifEncode': 'Encoding the GIF…', 'export.recording': 'Recording the timelapse… {s} s', 'export.done': 'Saved: {file}', 'export.noVideo': 'This browser can’t record video.', 'export.fail': 'Export failed: {msg}', 'health.title': '🩺 Code health', 'health.sub': 'What deserves a look', 'health.huge': 'Huge files (≥ 1,000 lines)', 'health.cycle': 'Import cycles', 'health.complex': 'Very complex (≥ 150 branches)', 'health.todo': 'Piled-up TODO / FIXME (≥ 5)', 'health.orphan': 'Never imported (dead code?)', 'health.none': 'Nothing to report 🎉', 'health.loop': 'Loop of {n} files', 'health.more': '…and {n} more', 'w.huge': 'Huge file: {n} lines', 'w.cycle': 'Part of an import cycle', 'w.complex': 'Very complex: {n} branches', 'w.todo': '{n} TODO / FIXME', 'w.orphan': 'Never imported (dead code?)',
   'search.ph': 'Search a file…  ( / )', 'lang.title': 'Language', 'theme.title': 'Theme',
   'btn.night.t': 'Day / night (automatic cycle: 2 min each)', 'btn.night.l': ' Night', 'btn.deps.t': 'Show all dependencies', 'btn.deps.l': ' Links',
   'btn.traffic.t': 'Traffic', 'btn.traffic.l': ' Traffic', 'btn.labels.t': 'District names', 'btn.labels.l': ' Districts',
   'btn.home.t': 'Recenter the view', 'btn.land.t': "New countryside: hills, lakes, forests (Shift+click: the project's original map)", 'btn.land.l': ' Map',
-  'btn.shot.t': 'Screenshot (PNG)', 'btn.open.t': 'Open another folder', 'btn.open.l': ' Open',
+  'btn.shot.t': 'Export: image, animated GIF, timelapse video', 'btn.open.t': 'Open another folder', 'btn.open.l': ' Open',
   'legend.title': '🗺️ Legend', 'panel.close': 'Close',
   'help': 'Drag: rotate · Right click: pan · Wheel: zoom · Double-click: fly to',
   'welcome.lead': 'Your code becomes a city. Every folder is a district, every file a building.',
@@ -69,11 +70,12 @@ I18N_D.en = {
 };
 
 I18N_D.fr = {
+  'btn.health.t': 'Santé du code : fichiers géants, boucles d\’imports, code mort…', 'btn.health.l': ' Santé', 'export.png': 'Image (PNG)', 'export.gif': 'GIF animé (tour complet)', 'export.video': 'Vidéo timelapse (construction)', 'export.gifFrames': 'GIF : image {i}/{n}', 'export.gifEncode': 'Encodage du GIF…', 'export.recording': 'Enregistrement du timelapse… {s} s', 'export.done': 'Enregistré : {file}', 'export.noVideo': 'Ce navigateur ne sait pas enregistrer de vidéo.', 'export.fail': 'Échec de l\’export : {msg}', 'health.title': '🩺 Santé du code', 'health.sub': 'Ce qui mérite un coup d\’œil', 'health.huge': 'Fichiers géants (≥ 1 000 lignes)', 'health.cycle': 'Dépendances circulaires', 'health.complex': 'Très complexes (≥ 150 branches)', 'health.todo': 'TODO / FIXME accumulés (≥ 5)', 'health.orphan': 'Jamais importés (code mort ?)', 'health.none': 'Rien à signaler 🎉', 'health.loop': 'Boucle de {n} fichiers', 'health.more': '… et {n} autres', 'w.huge': 'Fichier géant : {n} lignes', 'w.cycle': 'Fait partie d\’une boucle d\’imports', 'w.complex': 'Très complexe : {n} branches', 'w.todo': '{n} TODO / FIXME', 'w.orphan': 'Jamais importé (code mort ?)',
   'search.ph': 'Chercher un fichier…  ( / )', 'lang.title': 'Langue', 'theme.title': 'Thème',
   'btn.night.t': 'Jour / nuit (cycle automatique de 2 min chacun)', 'btn.night.l': ' Nuit', 'btn.deps.t': 'Afficher toutes les dépendances', 'btn.deps.l': ' Liens',
   'btn.traffic.t': 'Circulation', 'btn.traffic.l': ' Trafic', 'btn.labels.t': 'Noms des quartiers', 'btn.labels.l': ' Quartiers',
   'btn.home.t': 'Recentrer la vue', 'btn.land.t': "Nouvelle campagne : relief, lacs, forêts (Maj+clic : carte d'origine du projet)", 'btn.land.l': ' Carte',
-  'btn.shot.t': "Capture d'écran (PNG)", 'btn.open.t': 'Ouvrir un autre dossier', 'btn.open.l': ' Ouvrir',
+  'btn.shot.t': 'Exporter : image, GIF animé, vidéo timelapse', 'btn.open.t': 'Ouvrir un autre dossier', 'btn.open.l': ' Ouvrir',
   'legend.title': '🗺️ Légende', 'panel.close': 'Fermer',
   'help': "Glisser : tourner · Clic droit : déplacer · Molette : zoom · Double-clic : s'approcher",
   'welcome.lead': 'Ton code devient une ville. Chaque dossier est un quartier, chaque fichier un bâtiment.',
@@ -127,11 +129,12 @@ I18N_D.fr = {
 };
 
 I18N_D.de = {
+  'btn.health.t': 'Code-Gesundheit: riesige Dateien, Import-Zyklen, toter Code…', 'btn.health.l': ' Gesundheit', 'export.png': 'Bild (PNG)', 'export.gif': 'Animiertes GIF (volle Runde)', 'export.video': 'Zeitraffer-Video (Bau)', 'export.gifFrames': 'GIF: Bild {i}/{n}', 'export.gifEncode': 'GIF wird kodiert…', 'export.recording': 'Zeitraffer wird aufgenommen… {s} s', 'export.done': 'Gespeichert: {file}', 'export.noVideo': 'Dieser Browser kann kein Video aufnehmen.', 'export.fail': 'Export fehlgeschlagen: {msg}', 'health.title': '🩺 Code-Gesundheit', 'health.sub': 'Was einen Blick verdient', 'health.huge': 'Riesige Dateien (≥ 1.000 Zeilen)', 'health.cycle': 'Zirkuläre Abhängigkeiten', 'health.complex': 'Sehr komplex (≥ 150 Verzweigungen)', 'health.todo': 'Angehäufte TODO / FIXME (≥ 5)', 'health.orphan': 'Nie importiert (toter Code?)', 'health.none': 'Nichts zu melden 🎉', 'health.loop': 'Zyklus aus {n} Dateien', 'health.more': '… und {n} weitere', 'w.huge': 'Riesige Datei: {n} Zeilen', 'w.cycle': 'Teil eines Import-Zyklus', 'w.complex': 'Sehr komplex: {n} Verzweigungen', 'w.todo': '{n} TODO / FIXME', 'w.orphan': 'Nie importiert (toter Code?)',
   'search.ph': 'Datei suchen…  ( / )', 'lang.title': 'Sprache', 'theme.title': 'Thema',
   'btn.night.t': 'Tag / Nacht (automatischer Wechsel alle 2 Min.)', 'btn.night.l': ' Nacht', 'btn.deps.t': 'Alle Abhängigkeiten anzeigen', 'btn.deps.l': ' Links',
   'btn.traffic.t': 'Verkehr', 'btn.traffic.l': ' Verkehr', 'btn.labels.t': 'Namen der Viertel', 'btn.labels.l': ' Viertel',
   'btn.home.t': 'Ansicht zentrieren', 'btn.land.t': 'Neue Landschaft: Hügel, Seen, Wälder (Umschalt+Klick: ursprüngliche Karte des Projekts)', 'btn.land.l': ' Karte',
-  'btn.shot.t': 'Screenshot (PNG)', 'btn.open.t': 'Anderen Ordner öffnen', 'btn.open.l': ' Öffnen',
+  'btn.shot.t': 'Export: Bild, animiertes GIF, Zeitraffer-Video', 'btn.open.t': 'Anderen Ordner öffnen', 'btn.open.l': ' Öffnen',
   'legend.title': '🗺️ Legende', 'panel.close': 'Schließen',
   'help': 'Ziehen: drehen · Rechtsklick: verschieben · Mausrad: zoomen · Doppelklick: hinfliegen',
   'welcome.lead': 'Dein Code wird zur Stadt. Jeder Ordner ist ein Viertel, jede Datei ein Gebäude.',
@@ -185,11 +188,12 @@ I18N_D.de = {
 };
 
 I18N_D.it = {
+  'btn.health.t': 'Salute del codice: file enormi, cicli di import, codice morto…', 'btn.health.l': ' Salute', 'export.png': 'Immagine (PNG)', 'export.gif': 'GIF animata (giro completo)', 'export.video': 'Video timelapse (costruzione)', 'export.gifFrames': 'GIF: fotogramma {i}/{n}', 'export.gifEncode': 'Codifica della GIF…', 'export.recording': 'Registrazione del timelapse… {s} s', 'export.done': 'Salvato: {file}', 'export.noVideo': 'Questo browser non può registrare video.', 'export.fail': 'Esportazione non riuscita: {msg}', 'health.title': '🩺 Salute del codice', 'health.sub': 'Cosa merita uno sguardo', 'health.huge': 'File enormi (≥ 1.000 righe)', 'health.cycle': 'Dipendenze circolari', 'health.complex': 'Molto complessi (≥ 150 ramificazioni)', 'health.todo': 'TODO / FIXME accumulati (≥ 5)', 'health.orphan': 'Mai importati (codice morto?)', 'health.none': 'Niente da segnalare 🎉', 'health.loop': 'Ciclo di {n} file', 'health.more': '… e altri {n}', 'w.huge': 'File enorme: {n} righe', 'w.cycle': 'Fa parte di un ciclo di import', 'w.complex': 'Molto complesso: {n} ramificazioni', 'w.todo': '{n} TODO / FIXME', 'w.orphan': 'Mai importato (codice morto?)',
   'search.ph': 'Cerca un file…  ( / )', 'lang.title': 'Lingua', 'theme.title': 'Tema',
   'btn.night.t': 'Giorno / notte (ciclo automatico di 2 min ciascuno)', 'btn.night.l': ' Notte', 'btn.deps.t': 'Mostra tutte le dipendenze', 'btn.deps.l': ' Link',
   'btn.traffic.t': 'Traffico', 'btn.traffic.l': ' Traffico', 'btn.labels.t': 'Nomi dei quartieri', 'btn.labels.l': ' Quartieri',
   'btn.home.t': 'Ricentra la vista', 'btn.land.t': 'Nuova campagna: colline, laghi, foreste (Maiusc+clic: mappa originale del progetto)', 'btn.land.l': ' Mappa',
-  'btn.shot.t': 'Screenshot (PNG)', 'btn.open.t': "Apri un'altra cartella", 'btn.open.l': ' Apri',
+  'btn.shot.t': 'Esporta: immagine, GIF animata, video timelapse', 'btn.open.t': "Apri un'altra cartella", 'btn.open.l': ' Apri',
   'legend.title': '🗺️ Legenda', 'panel.close': 'Chiudi',
   'help': 'Trascina: ruota · Clic destro: sposta · Rotellina: zoom · Doppio clic: avvicinati',
   'welcome.lead': 'Il tuo codice diventa una città. Ogni cartella è un quartiere, ogni file un edificio.',
@@ -243,11 +247,12 @@ I18N_D.it = {
 };
 
 I18N_D.es = {
+  'btn.health.t': 'Salud del código: archivos enormes, ciclos de imports, código muerto…', 'btn.health.l': ' Salud', 'export.png': 'Imagen (PNG)', 'export.gif': 'GIF animado (vuelta completa)', 'export.video': 'Vídeo timelapse (construcción)', 'export.gifFrames': 'GIF: fotograma {i}/{n}', 'export.gifEncode': 'Codificando el GIF…', 'export.recording': 'Grabando el timelapse… {s} s', 'export.done': 'Guardado: {file}', 'export.noVideo': 'Este navegador no puede grabar vídeo.', 'export.fail': 'Error al exportar: {msg}', 'health.title': '🩺 Salud del código', 'health.sub': 'Lo que merece un vistazo', 'health.huge': 'Archivos enormes (≥ 1000 líneas)', 'health.cycle': 'Dependencias circulares', 'health.complex': 'Muy complejos (≥ 150 ramificaciones)', 'health.todo': 'TODO / FIXME acumulados (≥ 5)', 'health.orphan': 'Nunca importados (¿código muerto?)', 'health.none': 'Nada que señalar 🎉', 'health.loop': 'Ciclo de {n} archivos', 'health.more': '… y {n} más', 'w.huge': 'Archivo enorme: {n} líneas', 'w.cycle': 'Forma parte de un ciclo de imports', 'w.complex': 'Muy complejo: {n} ramificaciones', 'w.todo': '{n} TODO / FIXME', 'w.orphan': 'Nunca importado (¿código muerto?)',
   'search.ph': 'Buscar un archivo…  ( / )', 'lang.title': 'Idioma', 'theme.title': 'Tema',
   'btn.night.t': 'Día / noche (ciclo automático de 2 min cada uno)', 'btn.night.l': ' Noche', 'btn.deps.t': 'Mostrar todas las dependencias', 'btn.deps.l': ' Enlaces',
   'btn.traffic.t': 'Tráfico', 'btn.traffic.l': ' Tráfico', 'btn.labels.t': 'Nombres de los barrios', 'btn.labels.l': ' Barrios',
   'btn.home.t': 'Recentrar la vista', 'btn.land.t': 'Nuevo campo: colinas, lagos, bosques (Mayús+clic: mapa original del proyecto)', 'btn.land.l': ' Mapa',
-  'btn.shot.t': 'Captura de pantalla (PNG)', 'btn.open.t': 'Abrir otra carpeta', 'btn.open.l': ' Abrir',
+  'btn.shot.t': 'Exportar: imagen, GIF animado, vídeo timelapse', 'btn.open.t': 'Abrir otra carpeta', 'btn.open.l': ' Abrir',
   'legend.title': '🗺️ Leyenda', 'panel.close': 'Cerrar',
   'help': 'Arrastrar: girar · Clic derecho: desplazar · Rueda: zoom · Doble clic: acercarse',
   'welcome.lead': 'Tu código se convierte en una ciudad. Cada carpeta es un barrio, cada archivo un edificio.',
@@ -301,11 +306,12 @@ I18N_D.es = {
 };
 
 I18N_D.zh = {
+  'btn.health.t': '代码健康：超大文件、循环依赖、死代码…', 'btn.health.l': ' 健康', 'export.png': '图片（PNG）', 'export.gif': 'GIF 动图（环绕一周）', 'export.video': '延时视频（建造过程）', 'export.gifFrames': 'GIF：第 {i}/{n} 帧', 'export.gifEncode': '正在编码 GIF…', 'export.recording': '正在录制延时视频… {s} 秒', 'export.done': '已保存：{file}', 'export.noVideo': '此浏览器无法录制视频。', 'export.fail': '导出失败：{msg}', 'health.title': '🩺 代码健康', 'health.sub': '值得一看的地方', 'health.huge': '超大文件（≥ 1000 行）', 'health.cycle': '循环依赖', 'health.complex': '非常复杂（≥ 150 个分支）', 'health.todo': '堆积的 TODO / FIXME（≥ 5）', 'health.orphan': '从未被导入（死代码？）', 'health.none': '一切正常 🎉', 'health.loop': '{n} 个文件组成的循环', 'health.more': '…还有 {n} 个', 'w.huge': '超大文件：{n} 行', 'w.cycle': '属于一个循环依赖', 'w.complex': '非常复杂：{n} 个分支', 'w.todo': '{n} 个 TODO / FIXME', 'w.orphan': '从未被导入（死代码？）',
   'search.ph': '搜索文件…  ( / )', 'lang.title': '语言', 'theme.title': '主题',
   'btn.night.t': '白天 / 夜晚（自动循环，各 2 分钟）', 'btn.night.l': ' 夜晚', 'btn.deps.t': '显示所有依赖', 'btn.deps.l': ' 依赖',
   'btn.traffic.t': '交通', 'btn.traffic.l': ' 交通', 'btn.labels.t': '街区名称', 'btn.labels.l': ' 街区',
   'btn.home.t': '重置视角', 'btn.land.t': '新的郊野：山丘、湖泊、森林（Shift+点击：恢复项目原始地图）', 'btn.land.l': ' 地图',
-  'btn.shot.t': '截图（PNG）', 'btn.open.t': '打开其他文件夹', 'btn.open.l': ' 打开',
+  'btn.shot.t': '导出：图片、GIF 动图、延时视频', 'btn.open.t': '打开其他文件夹', 'btn.open.l': ' 打开',
   'legend.title': '🗺️ 图例', 'panel.close': '关闭',
   'help': '拖动：旋转 · 右键：平移 · 滚轮：缩放 · 双击：飞近',
   'welcome.lead': '你的代码变成一座城市。每个文件夹是一个街区，每个文件是一栋建筑。',
@@ -358,11 +364,12 @@ I18N_D.zh = {
 };
 
 I18N_D.ru = {
+  'btn.health.t': 'Здоровье кода: огромные файлы, циклы импортов, мёртвый код…', 'btn.health.l': ' Здоровье', 'export.png': 'Изображение (PNG)', 'export.gif': 'Анимированный GIF (полный оборот)', 'export.video': 'Таймлапс-видео (строительство)', 'export.gifFrames': 'GIF: кадр {i}/{n}', 'export.gifEncode': 'Кодирование GIF…', 'export.recording': 'Запись таймлапса… {s} с', 'export.done': 'Сохранено: {file}', 'export.noVideo': 'Этот браузер не умеет записывать видео.', 'export.fail': 'Ошибка экспорта: {msg}', 'health.title': '🩺 Здоровье кода', 'health.sub': 'На что стоит взглянуть', 'health.huge': 'Огромные файлы (≥ 1000 строк)', 'health.cycle': 'Циклические зависимости', 'health.complex': 'Очень сложные (≥ 150 ветвлений)', 'health.todo': 'Накопившиеся TODO / FIXME (≥ 5)', 'health.orphan': 'Никогда не импортируются (мёртвый код?)', 'health.none': 'Всё в порядке 🎉', 'health.loop': 'Цикл из {n} файлов', 'health.more': '… и ещё {n}', 'w.huge': 'Огромный файл: строк {n}', 'w.cycle': 'Входит в цикл импортов', 'w.complex': 'Очень сложный: ветвлений {n}', 'w.todo': 'TODO / FIXME: {n}', 'w.orphan': 'Никогда не импортируется (мёртвый код?)',
   'search.ph': 'Найти файл…  ( / )', 'lang.title': 'Язык', 'theme.title': 'Тема',
   'btn.night.t': 'День / ночь (автоматическая смена каждые 2 мин)', 'btn.night.l': ' Ночь', 'btn.deps.t': 'Показать все зависимости', 'btn.deps.l': ' Связи',
   'btn.traffic.t': 'Движение', 'btn.traffic.l': ' Движение', 'btn.labels.t': 'Названия районов', 'btn.labels.l': ' Районы',
   'btn.home.t': 'Вернуть вид', 'btn.land.t': 'Новая местность: холмы, озёра, леса (Shift+клик: исходная карта проекта)', 'btn.land.l': ' Карта',
-  'btn.shot.t': 'Снимок экрана (PNG)', 'btn.open.t': 'Открыть другую папку', 'btn.open.l': ' Открыть',
+  'btn.shot.t': 'Экспорт: изображение, GIF, таймлапс-видео', 'btn.open.t': 'Открыть другую папку', 'btn.open.l': ' Открыть',
   'legend.title': '🗺️ Легенда', 'panel.close': 'Закрыть',
   'help': 'Перетаскивание: вращение · Правая кнопка: сдвиг · Колесо: масштаб · Двойной клик: приблизиться',
   'welcome.lead': 'Твой код становится городом. Каждая папка — район, каждый файл — здание.',
