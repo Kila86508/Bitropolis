@@ -8,6 +8,8 @@ import { layoutGrid, CELL } from '../core/grid.js';
 import { VEHICLES, ROAD_KIT_HALF, ROAD_KIT_TOP, ROAD_KIT_TIERS, ROAD_KIT_DECK, ROAD_KIT_DECK_WOOD } from '../core/catalog.js';
 import { packReady, packModel, setPackOverlay, overlayActive } from './assets.js';
 import { buildPackCity, buildPackVehicles, makePackMaterial, CITY_Y } from './citypack.js';
+import { FxPost } from './post.js';
+import { FxWeather } from './weather.js';
 import { TrafficSim } from './traffic.js';
 import { tp } from './i18n.js';
 import { HEALTH } from '../core/analyze.js';
@@ -135,6 +137,13 @@ export class CityRenderer {
     this.clock = new THREE.Clock();
     this.glow = { value: 0 };
     this.timeU = { value: 0 }; // horloge des lumières (fenêtres qui s'allument / s'éteignent)
+    // effets réglables depuis le HUD : qualité des shaders ('std' | 'high'), météo ('clear' | 'rain' | 'storm'), nuages
+    this.fx = { quality: 'std', weather: 'clear', clouds: true };
+    this.wetU = { value: 0 };   // sol mouillé (0 … 1) : monte vite quand il pleut, redescend lentement
+    this.rainU = { value: 0 };  // pluie en cours (0 … 1)
+    this.fancyU = { value: 0 }; // 1 : beaux shaders
+    this.skyU = { value: new THREE.Color('#bfe3f7') }; // couleur du ciel (reflets de l'eau)
+    this.post = null;
     this.night = false;
     this.nightMix = 0;
     // Cycle jour / nuit automatique : 2 min de jour, 2 min de nuit, crépuscule et aube progressifs
@@ -152,6 +161,7 @@ export class CityRenderer {
     this.sun.shadow.normalBias = 0.02;
     this.ambient = new THREE.AmbientLight('#ffffff', 0.25);
     this.scene.add(this.hemi, this.sun, this.sun.target, this.ambient);
+    this.weather = new FxWeather(this.scene);
 
     this.city = null;
     this.root = null;
@@ -234,7 +244,7 @@ export class CityRenderer {
     this.buildings = new Array(files.length);
     if (usePack) {
       // --- Ville du pack : sol, routes N1→N8, bâtiments à stades, arbres, monuments
-      this._packMat = makePackMaterial(this.glow, this.timeU, { winTint: this.theme.winTint });
+      this._packMat = makePackMaterial(this.glow, this.timeU, { winTint: this.theme.winTint, wet: this.wetU, rain: this.rainU, fancy: this.fancyU, sky: this.skyU });
       const pc = buildPackCity(city, analysis, this._packMat, makeRng('pack:' + analysis.name));
       root.add(pc.group);
       this.buildings = pc.buildings;
@@ -339,6 +349,7 @@ export class CityRenderer {
     this.clouds = new THREE.Group();
     const crng = makeRng('clouds');
     const cloudMat = new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true, roughness: 1, transparent: true, opacity: 0.92 });
+    this.cloudMat = cloudMat; // la météo le grise
     const ico = new THREE.IcosahedronGeometry(1, 0);
     const nClouds = Math.round(8 + city.size / 25);
     for (let i = 0; i < nClouds; i++) {
@@ -356,6 +367,7 @@ export class CityRenderer {
       this.clouds.add(c);
     }
     this.cloudSpan = T * 0.7;
+    this.clouds.visible = this.fx.clouds;
     root.add(this.clouds);
 
     // --- Voitures
@@ -395,6 +407,7 @@ export class CityRenderer {
     this.controls.autoRotate = true;
     const fogNear = Math.max(outer * 2.2, this.landHalf * 1.5);
     this.scene.fog = new THREE.Fog(theme.sky.fogDay, fogNear, fogNear + T * (this.landHalf ? 1.6 : 0.55));
+    this.fogBase = [this.scene.fog.near, this.scene.fog.far]; // la pluie rapproche l'horizon (voir _applyNight)
     // Hauteur sous laquelle se trouve tout ce qui est affiché (bâtiments à leur taille finale, nuages, relief) :
     // au-dessus, la caméra peut éloigner son plan proche sans rien couper (voir _fitDepth).
     let top = new THREE.Box3().setFromObject(root).max.y;
@@ -853,7 +866,7 @@ export class CityRenderer {
   drawView(ctx, w, h, render = true) {
     if (render) {
       if (this.lod) this.lod.update(this.camera);
-      this.renderer.render(this.scene, this.camera);
+      this._draw();
     }
     const src = this.renderer.domElement, sw = src.width, sh = src.height, ratio = w / h;
     let cw = sw, ch = sw / ratio;
@@ -878,6 +891,25 @@ export class CityRenderer {
   }
   setDayCycle(on) { this.dayCycle.on = on; }
   setTraffic(on) { this.state.traffic = on; }
+  // --- Effets (HUD)
+  // qualité des shaders : 'high' ajoute un halo lumineux et des reflets ; renvoie la qualité réellement retenue
+  setQuality(q) {
+    if (q === 'high') {
+      if (!this.post) this.post = new FxPost(this.renderer);
+      if (!this.post.ok) q = 'std'; // carte graphique sans image à virgule flottante
+    } else q = 'std';
+    this.fx.quality = q;
+    this.fancyU.value = q === 'high' ? 1 : 0;
+    if (q !== 'high' && this.post) this.post.dispose();
+    return q;
+  }
+  setWeather(kind) { this.weather.set(kind); this.fx.weather = this.weather.kind; return this.fx.weather; }
+  setClouds(on) { this.fx.clouds = !!on; if (this.clouds) this.clouds.visible = this.fx.clouds; }
+  // dessine l'image : rendu simple, ou rendu avec halo quand les beaux shaders sont choisis
+  _draw() {
+    if (this.fx.quality === 'high' && this.post && this.post.ok) this.post.render(this.scene, this.camera, this.glow.value);
+    else { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); }
+  }
   setLabels(on) { this.state.labels = on; if (this.labels) this.labels.visible = on; }
   setDeps(on) { this.state.deps = on; if (on) this._buildDeps(); if (this.depGroup) this.depGroup.visible = on; }
 
@@ -886,26 +918,39 @@ export class CityRenderer {
     if (!force && Math.abs(this.nightMix - target) < 0.001) return;
     const k = this.nightMix;
     const th = this.theme;
+    // météo : w = ciel couvert (0 : clair … 1 : orage), fl = éclair en cours (0 … 1)
+    const w = this.weather.amount, fl = this.weather.flash;
     // crépuscule et aube (dusk : 0 en plein jour et en pleine nuit, 1 au milieu du fondu) : le ciel rosit, le soleil
-    // descend vers l'horizon en virant à l'orangé — les ombres s'allongent — puis la lune se lève d'un autre côté
-    const dusk = Math.sin(Math.PI * k), warm = new THREE.Color(th.sky.dusk || '#f2a57c');
-    const sky = new THREE.Color(th.sky.day).lerp(new THREE.Color(th.sky.night), k).lerp(warm, 0.45 * dusk);
+    // descend vers l'horizon en virant à l'orangé — les ombres s'allongent — puis la lune se lève d'un autre côté.
+    // Sous la pluie, le ciel reste gris : pas de coucher de soleil flamboyant.
+    const low = Math.sin(Math.PI * k), dusk = low * (1 - 0.7 * w), warm = new THREE.Color(th.sky.dusk || '#f2a57c');
+    const grey = new THREE.Color('#8793a1').lerp(new THREE.Color('#0d111b'), k), cover = 0.85 * w * (1 - 0.45 * k), bolt = new THREE.Color('#cfd8ff');
+    const sky = new THREE.Color(th.sky.day).lerp(new THREE.Color(th.sky.night), k).lerp(warm, 0.45 * dusk).lerp(grey, cover).lerp(bolt, 0.55 * fl);
     this.scene.background = sky;
-    if (this.scene.fog) this.scene.fog.color.copy(new THREE.Color(th.sky.fogDay).lerp(new THREE.Color(th.sky.fogNight), k).lerp(warm, 0.4 * dusk));
+    this.skyU.value.copy(sky);
+    if (this.scene.fog) {
+      this.scene.fog.color.copy(new THREE.Color(th.sky.fogDay).lerp(new THREE.Color(th.sky.fogNight), k).lerp(warm, 0.4 * dusk).lerp(grey, cover).lerp(bolt, 0.45 * fl));
+      // la pluie rapproche l'horizon
+      if (this.fogBase) { this.scene.fog.near = this.fogBase[0] * (1 - 0.55 * w); this.scene.fog.far = this.fogBase[1] * (1 - 0.4 * w); }
+    }
     if (this.sunS) {
-      const el = (58.7 - 40 * dusk) * Math.PI / 180, az = (34.5 + 60 * k) * Math.PI / 180, R = this.sunS * 1.87;
+      const el = (58.7 - 40 * low) * Math.PI / 180, az = (34.5 + 60 * k) * Math.PI / 180, R = this.sunS * 1.87;
       this.sun.position.set(R * Math.cos(el) * Math.cos(az), R * Math.sin(el), R * Math.cos(el) * Math.sin(az));
     }
     // éclairage de nuit : celui du thème s'il en définit un (Cyberpunk : ambiance violette plus lumineuse)
     const NL = th.nightLight || {};
-    this.sun.intensity = 2.4 * (1 - k) + (NL.sun ?? 0.35) * k;
+    this.sun.intensity = (2.4 * (1 - k) + (NL.sun ?? 0.35) * k) * (1 - 0.62 * w);
     this.sun.color.set('#fff1d6').lerp(new THREE.Color(NL.sunColor || '#9db4ff'), k).lerp(new THREE.Color('#ff9a52'), 0.75 * dusk);
-    this.hemi.intensity = 1.0 * (1 - k) + (NL.hemi ?? 0.28) * k;
-    this.hemi.color.set('#e6f4ff').lerp(new THREE.Color(NL.hemiSky || '#e6f4ff'), k).lerp(warm, 0.3 * dusk);
+    this.hemi.intensity = (1.0 * (1 - k) + (NL.hemi ?? 0.28) * k) * (1 - 0.2 * w) + 1.3 * fl;
+    this.hemi.color.set('#e6f4ff').lerp(new THREE.Color(NL.hemiSky || '#e6f4ff'), k).lerp(warm, 0.3 * dusk).lerp(new THREE.Color('#aab4c2'), 0.6 * w * (1 - 0.5 * k)).lerp(bolt, 0.6 * fl);
     this.hemi.groundColor.set('#6f8f5a').lerp(new THREE.Color(NL.hemiGround || '#6f8f5a'), k);
-    this.ambient.intensity = 0.25 * (1 - k) + (NL.ambient ?? 0.12) * k;
-    this.glow.value = k * 1.0;
-    this.renderer.toneMappingExposure = 1.05 - k * 0.1;
+    this.ambient.intensity = 0.25 * (1 - k) + (NL.ambient ?? 0.12) * k + 0.9 * fl;
+    // par temps sombre, les lampes et une partie des fenêtres s'allument même de jour
+    this.glow.value = Math.max(k, 0.55 * w);
+    this.renderer.toneMappingExposure = (1.05 - k * 0.1) * (1 - 0.1 * w);
+    if (this.cloudMat) this.cloudMat.color.set('#ffffff').lerp(new THREE.Color('#5d6672'), w).lerp(bolt, 0.5 * fl);
+    // la pluie est plus sombre la nuit (sinon elle paraît blanche, et le halo des beaux shaders l'épaissit)
+    this.weather.rain.material.color.set('#cfe0f5').lerp(new THREE.Color('#46536a'), 0.85 * k);
   }
 
   // --- Interaction
@@ -980,7 +1025,7 @@ export class CityRenderer {
   focusPoint(x, z, radius) { this.controls.flyTo(x, 0, z, radius || 30, 0.9); this.controls.autoRotate = false; }
   resetView() { if (this.home) this.controls.flyTo(0, 0, 0, this.home.radius, this.home.phi); }
 
-  screenshot() { if (this.lod) this.lod.update(this.camera); this.renderer.render(this.scene, this.camera); return this.canvas.toDataURL('image/png'); }
+  screenshot() { if (this.lod) this.lod.update(this.camera); this._draw(); return this.canvas.toDataURL('image/png'); }
 
   // Précision de profondeur. Avec un plan proche fixe à 0,5, deux surfaces à quelques centimètres l'une de l'autre
   // (une fenêtre sur son mur, un marquage sur la chaussée) scintillent dès qu'on dézoome. Le plan proche s'éloigne donc :
@@ -998,6 +1043,13 @@ export class CityRenderer {
     const dt = Math.min(0.05, this.clock.getDelta());
     this.controls.update(dt);
     this._fitDepth();
+    // météo : la pluie tombe autour de la vue, le sol se mouille vite et sèche lentement, les éclairs illuminent tout
+    this.weather.group.visible = !!this.city;
+    const wxMoved = this.weather.update(dt, this.controls.target, this.controls.radius, CITY_Y);
+    const wetGoal = this.weather.amount > 0.05 ? Math.min(1, this.weather.amount * 1.4) : 0, wetNow = this.wetU.value;
+    this.wetU.value += Math.sign(wetGoal - wetNow) * Math.min(Math.abs(wetGoal - wetNow), dt * (wetGoal > wetNow ? 0.3 : 0.07));
+    this.rainU.value = this.weather.amount;
+    if (wxMoved && this.city) this._applyNight(true);
     if (this.city) {
       const cyc = this.dayCycle;
       if (cyc.on) {
@@ -1032,6 +1084,6 @@ export class CityRenderer {
       }
     }
     if (this.lod) this.lod.update(this.camera); // grandes villes : seulement ce qui est visible, simplifié au loin
-    this.renderer.render(this.scene, this.camera);
+    this._draw();
   }
 }

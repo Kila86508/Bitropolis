@@ -24,6 +24,8 @@ const MODULES = [
   'src/viewer/landscape.js',
   'src/viewer/citypack.js',
   'src/viewer/traffic.js',
+  'src/viewer/post.js',
+  'src/viewer/weather.js',
   'src/viewer/render.js',
   'src/viewer/export.js',
   'src/viewer/ui.js',

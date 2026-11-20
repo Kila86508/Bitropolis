@@ -35,7 +35,11 @@ const GROUND_Y = CITY_Y - 0.012 * CELL; // dalles de sol, légèrement sous les 
 //    commandées par l'attribut d'instance aSig = (état X, état Y) : 0 rouge, 1 orange, 2 vert.
 //  - néons (aLit = 10) : brillent dans leur propre couleur, de jour un peu, de nuit beaucoup ;
 //  - eau (aLit = 11) : ondulations qui se déplacent, reflets clairs, soleil qui scintille à la surface ;
-//  - partout : le bas des murs est légèrement assombri, pour que les bâtiments « posent » au sol.
+//  - partout : le bas des murs est légèrement assombri, pour que les bâtiments « posent » au sol ;
+//  - pluie (uWet : sol mouillé, uRain : pluie en cours) : les surfaces foncent, le sol et les toits brillent,
+//    de petites éclaboussures sautillent, l'eau s'agite ;
+//  - beaux shaders (uFancy) : l'eau reflète le ciel (uSky), les murs sont un peu plus ancrés au sol.
+// opts.wet, opts.rain, opts.fancy, opts.sky : uniformes partagés avec le moteur de rendu.
 // opts.winTint : part de la couleur du matériau dans la lueur des fenêtres (0,15 : orangé chaud ; Cyberpunk : couleurs vives)
 export function makePackMaterial(uGlow, uTime, opts = {}) {
   // double face : permet d'inverser certains bâtiments en miroir (l'éclairage « flat » reste juste)
@@ -46,6 +50,10 @@ export function makePackMaterial(uGlow, uTime, opts = {}) {
     sh.uniforms.uTime = uTime;
     sh.uniforms.uScheme = { value: schemes };
     sh.uniforms.uWinTint = { value: opts.winTint ?? 0.15 };
+    sh.uniforms.uWet = opts.wet || { value: 0 };
+    sh.uniforms.uRain = opts.rain || { value: 0 };
+    sh.uniforms.uFancy = opts.fancy || { value: 0 };
+    sh.uniforms.uSky = opts.sky || { value: new THREE.Color('#bfe3f7') };
     const varyings = 'varying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\nvarying float vNeon;\nvarying float vWater;\nvarying vec3 vWp;\n';
     sh.vertexShader = `attribute float aLit;\nattribute float aRole;\nattribute float aSeed;\nattribute vec2 aSig;\nuniform float uTime;\nuniform vec3 uScheme[${schemes.length}];\n${varyings}` +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -90,7 +98,7 @@ export function makePackMaterial(uGlow, uTime, opts = {}) {
       } else if (aLit > 0.5) {
         vWin = 1.0; // fenêtre : étages calculés par pixel (un grand panneau vitré couvre plusieurs étages)
       }`);
-    sh.fragmentShader = `uniform float uGlow;\nuniform float uTime;\nuniform float uWinTint;\n${varyings}` + sh.fragmentShader
+    sh.fragmentShader = `uniform float uGlow;\nuniform float uTime;\nuniform float uWinTint;\nuniform float uWet;\nuniform float uRain;\nuniform float uFancy;\nuniform vec3 uSky;\n${varyings}` + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         diffuseColor.rgb = mix(diffuseColor.rgb, vRecol, vRecolOn);
         if (vLamp > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb * 0.22, vLampCol * 0.55, vOn);`)
@@ -99,19 +107,35 @@ export function makePackMaterial(uGlow, uTime, opts = {}) {
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         vec3 bxN = inverseTransformDirection(normal, viewMatrix); // normale de la face dans le repère du monde
         // le bas des murs un peu plus sombre : les bâtiments « posent » au sol
-        diffuseColor.rgb *= 1.0 - 0.16 * (1.0 - smoothstep(0.35, 0.75, abs(bxN.y))) * (1.0 - smoothstep(0.015, 0.2, vFy));
+        diffuseColor.rgb *= 1.0 - (0.16 + 0.1 * uFancy) * (1.0 - smoothstep(0.35, 0.75, abs(bxN.y))) * (1.0 - smoothstep(0.015, 0.2, vFy));
+
+        // pluie : tout fonce un peu, le sol et les toits deviennent brillants, des éclaboussures sautillent près de la vue
+        if (uWet > 0.001 && vWater < 0.5) {
+          float bxUp = smoothstep(0.6, 0.9, bxN.y);
+          diffuseColor.rgb *= 1.0 - uWet * (0.1 + 0.16 * bxUp);
+          roughnessFactor = mix(roughnessFactor, 0.17, uWet * 0.9 * bxUp);
+          if (uRain > 0.01 && bxUp > 0.5) {
+            float sp = step(0.988, fract(sin(dot(floor(vWp.xz * 5.0), vec2(12.9898, 78.233)) + floor(uTime * 9.0) * 1.713) * 43758.5453));
+            diffuseColor.rgb += 0.2 * sp * uRain * (1.0 - smoothstep(40.0, 140.0, length(vViewPosition)));
+          }
+        }
 
         // eau : des ondes qui se croisent et se déplacent ; crêtes plus claires, creux plus sombres
         if (vWater > 0.5) {
           vec2 wp = vWp.xz;
           float a1 = wp.x * 5.1 + wp.y * 2.3 + uTime * 1.25, a2 = wp.x * -2.7 + wp.y * 6.3 - uTime * 1.6, a3 = (wp.x + wp.y) * 9.7 + uTime * 2.3;
           float w = sin(a1) * 0.5 + sin(a2) * 0.35 + sin(a3) * 0.15;
-          diffuseColor.rgb *= 0.94 + 0.1 * w;
+          float amp = 1.0 + 0.9 * uRain; // la pluie agite l'eau
+          diffuseColor.rgb *= 0.94 + 0.1 * w * amp;
           diffuseColor.rgb += vec3(0.1, 0.13, 0.14) * smoothstep(0.55, 0.95, w);
           roughnessFactor = 0.16;
           if (bxN.y > 0.5) { // surface : la normale suit la pente des ondes, le reflet du soleil scintille
-            vec2 slope = vec2(cos(a1) * 5.1 * 0.5 + cos(a2) * -2.7 * 0.35, cos(a1) * 2.3 * 0.5 + cos(a2) * 6.3 * 0.35) * 0.035;
+            vec2 slope = vec2(cos(a1) * 5.1 * 0.5 + cos(a2) * -2.7 * 0.35, cos(a1) * 2.3 * 0.5 + cos(a2) * 6.3 * 0.35) * 0.035 * amp;
             normal = normalize((viewMatrix * vec4(normalize(vec3(-slope.x, 1.0, -slope.y)), 0.0)).xyz);
+            if (uFancy > 0.5) { // beaux shaders : l'eau reflète le ciel, surtout vue de biais
+              float fr = pow(1.0 - max(dot(normalize(vViewPosition), normal), 0.0), 3.0);
+              diffuseColor.rgb = mix(diffuseColor.rgb, uSky, 0.65 * fr);
+            }
           }
         }
 
@@ -141,7 +165,7 @@ export function makePackMaterial(uGlow, uTime, opts = {}) {
         totalEmissiveRadiance += vColor.rgb * vNeon * (0.35 + 1.5 * uGlow);
         if (vLamp > 0.5) totalEmissiveRadiance += vLampCol * vOn * (0.7 + 1.6 * uGlow);`);
   };
-  mat.customProgramCacheKey = () => 'bitropolis-pack-7';
+  mat.customProgramCacheKey = () => 'bitropolis-pack-8';
   return mat;
 }
 

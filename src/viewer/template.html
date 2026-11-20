@@ -130,6 +130,14 @@ body.dragging #drop { display: grid; }
 #export-menu[hidden] { display: none; }
 #export-menu button { text-align: left; padding: 9px 12px; border-radius: 9px; background: transparent; border: 0; color: var(--text); cursor: pointer; font: inherit; }
 #export-menu button:hover { background: rgba(255,255,255,0.1); }
+#fx-menu { position: fixed; z-index: 12; padding: 10px 10px 8px; display: flex; flex-direction: column; gap: 4px; min-width: 250px; }
+#fx-menu[hidden] { display: none; }
+#fx-menu .fx-h { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted, rgba(255,255,255,0.55)); margin: 6px 4px 2px; }
+#fx-menu .fx-h:first-child { margin-top: 0; }
+#fx-menu .fx-row { display: flex; gap: 4px; }
+#fx-menu button { flex: 1; padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,0.05); border: 1px solid transparent; color: var(--text); cursor: pointer; font: inherit; white-space: nowrap; }
+#fx-menu button:hover { background: rgba(255,255,255,0.12); }
+#fx-menu button.on { background: rgba(255, 184, 77, 0.18); border-color: rgba(255,184,77,0.55); }
 #panel .warn { margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; background: rgba(255,90,95,0.12); border: 1px solid rgba(255,90,95,0.35); display: grid; gap: 4px; font-size: 13px; }
 #panel .health-more { color: rgba(255,255,255,0.55); font-size: 12px; margin: 2px 0 8px; }
 #loading .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.12); overflow: hidden; }
@@ -188,6 +196,7 @@ body:not(.has-city) #help { display: none; }
   <button id="btn-traffic" class="on" data-i18n-title="btn.traffic.t" title="Circulation">🚗<span class="lbl" data-i18n="btn.traffic.l"> Trafic</span></button>
   <button id="btn-labels" class="on" data-i18n-title="btn.labels.t" title="Noms des quartiers">🏷️<span class="lbl" data-i18n="btn.labels.l"> Quartiers</span></button>
   <button id="btn-health" data-i18n-title="btn.health.t" title="Santé du code">🩺<span class="lbl" data-i18n="btn.health.l"> Santé</span></button>
+  <button id="btn-fx" data-i18n-title="btn.fx.t" title="Effets : shaders, météo, nuages">✨<span class="lbl" data-i18n="btn.fx.l"> Effets</span></button>
   <button id="btn-home" data-i18n-title="btn.home.t" title="Recentrer la vue">🎯</button>
   <button id="btn-land" data-i18n-title="btn.land.t" title="Nouvelle campagne : relief, lacs, forêts (Maj+clic : carte d'origine du projet)">🎲<span class="lbl" data-i18n="btn.land.l"> Carte</span></button>
   <button id="btn-shot" data-i18n-title="btn.shot.t" title="Capture d'écran (PNG)">📸</button>
@@ -235,6 +244,14 @@ body:not(.has-city) #help { display: none; }
   <button data-export="png">🖼️ <span data-i18n="export.png">Image (PNG)</span></button>
   <button data-export="gif">🎞️ <span data-i18n="export.gif">GIF animé</span></button>
   <button data-export="video">🎬 <span data-i18n="export.video">Vidéo timelapse</span></button>
+</div>
+<div id="fx-menu" class="glass" hidden>
+  <div class="fx-h" data-i18n="fx.shaders">Shaders</div>
+  <div class="fx-row"><button data-fx="quality" data-v="std" data-i18n="fx.q.std">Simples</button><button data-fx="quality" data-v="high" data-i18n="fx.q.high">Beaux</button></div>
+  <div class="fx-h" data-i18n="fx.weather">Météo</div>
+  <div class="fx-row"><button data-fx="weather" data-v="clear">☀️ <span data-i18n="fx.w.clear">Clair</span></button><button data-fx="weather" data-v="rain">🌧️ <span data-i18n="fx.w.rain">Pluie</span></button><button data-fx="weather" data-v="storm">⛈️ <span data-i18n="fx.w.storm">Orage</span></button></div>
+  <div class="fx-h" data-i18n="fx.sky">Ciel</div>
+  <div class="fx-row"><button data-fx="clouds" data-v="toggle">☁️ <span data-i18n="fx.clouds">Nuages</span></button></div>
 </div>
 <input id="folder-input" type="file" webkitdirectory directory multiple hidden>
 

@@ -183,6 +183,36 @@ export class CityUI {
     });
     document.addEventListener('click', (ev) => { if (!ev.target.closest('#export-menu')) menu.hidden = true; });
     menu.addEventListener('click', (ev) => { const b = ev.target.closest('[data-export]'); if (!b) return; menu.hidden = true; this._export(b.dataset.export); });
+    // effets : qualité des shaders, météo, nuages — mémorisés d'une visite à l'autre
+    const fxMenu = $('#fx-menu'), fx = { quality: 'std', weather: 'clear', clouds: true };
+    try { Object.assign(fx, JSON.parse(localStorage.getItem('bitropolis.fx') || '{}')); } catch {}
+    const fxApply = (save) => {
+      const got = e.setQuality(fx.quality);
+      if (got !== fx.quality) { fx.quality = got; if (save) this.toast(t('fx.nohigh')); }
+      fx.weather = e.setWeather(fx.weather);
+      e.setClouds(fx.clouds);
+      for (const b of fxMenu.querySelectorAll('[data-fx]')) b.classList.toggle('on', b.dataset.fx === 'clouds' ? !!fx.clouds : fx[b.dataset.fx] === b.dataset.v);
+      $('#btn-fx').classList.toggle('on', fx.quality === 'high' || fx.weather !== 'clear');
+      if (save) try { localStorage.setItem('bitropolis.fx', JSON.stringify(fx)); } catch {}
+    };
+    fxApply(false);
+    $('#btn-fx').addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      menu.hidden = true;
+      if (!fxMenu.hidden) { fxMenu.hidden = true; return; }
+      const r = $('#btn-fx').getBoundingClientRect();
+      fxMenu.style.left = `${Math.max(8, Math.min(window.innerWidth - 270, r.left - 90))}px`;
+      if (r.top > window.innerHeight / 2) { fxMenu.style.top = ''; fxMenu.style.bottom = `${window.innerHeight - r.top + 8}px`; }
+      else { fxMenu.style.bottom = ''; fxMenu.style.top = `${r.bottom + 8}px`; }
+      fxMenu.hidden = false;
+    });
+    document.addEventListener('click', (ev) => { if (!ev.target.closest('#fx-menu')) fxMenu.hidden = true; });
+    fxMenu.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-fx]');
+      if (!b) return;
+      if (b.dataset.fx === 'clouds') fx.clouds = !fx.clouds; else fx[b.dataset.fx] = b.dataset.v;
+      fxApply(true);
+    });
     $('#btn-open').addEventListener('click', () => $('#folder-input').click());
     $('#welcome-open').addEventListener('click', () => $('#folder-input').click());
     $('#folder-input').addEventListener('change', async (ev) => {
