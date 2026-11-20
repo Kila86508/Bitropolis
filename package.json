@@ -34,6 +34,7 @@
     "src/",
     "scripts/bundle.js",
     "scripts/assets.js",
+    "scripts/lodpick.js",
     
     "dist/bitropolis.html",
     "LICENSE",

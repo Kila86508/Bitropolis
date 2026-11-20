@@ -8,6 +8,7 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { packModelNames, PROPS, KIT_PROPS, objScale } from '../src/core/catalog.js';
+import { chooseLod, saveLodCache } from './lodpick.js';
 import { obfName, obfXor } from '../src/core/obf.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -268,7 +269,8 @@ export function encode16(src, stride) {
 
 // --- Un pack = plusieurs modèles partageant une palette, sérialisés dans un seul binaire gzip.
 class PackWriter {
-  constructor() { this.palette = []; this.paletteIndex = new Map(); this.chunks = []; this.size = 0; this.models = {}; this.seen = new Map(); }
+  // lod : choisir pour chaque modèle le réglage de sa version simplifiée (affichage lointain), voir lodpick.js
+  constructor({ lod = false } = {}) { this.palette = []; this.paletteIndex = new Map(); this.chunks = []; this.size = 0; this.models = {}; this.seen = new Map(); this.lod = lod; }
   // role : matériau recolorable du pack (0 aucun, 1–3 murs, 4 toit, 5 boiseries, 6 accent)
   color(r, g, b, lit, role = 0) {
     const key = `${r},${g},${b},${lit},${role}`;
@@ -345,6 +347,8 @@ class PackWriter {
     }
     if (this.palette.length > 65535) throw new Error('Palette trop grande');
     this.models[name] = { n: nv, m: ni, s, e: 1, p: this.push(encode16(P, 3)), c: this.push(encode16(C, 1)), i: this.push(encode16(I, 1)), min: min.map((x) => +x.toFixed(4)), max: max.map((x) => +x.toFixed(4)) };
+    // même seuil que la visionneuse (150 triangles) : en dessous, le modèle n'a jamais de version simplifiée
+    if (this.lod && !name.includes('#') && ni / 3 >= 150) this.models[name].l = chooseLod(P, s, C, I);
     return true;
   }
   // Sérialise le pack : gzip puis brouillage (sel aléatoire par build), noms de modèles remplacés par des empreintes.
@@ -380,7 +384,7 @@ export function packLandscape({ skip = /^(retaining_wall|diorama_room|rail_|rais
 // Pack de ville : seulement les modèles utilisés par le catalogue (bâtiments, routes, arbres, véhicules).
 export function packCity({ dir = CITY_PACK_DIR } = {}) {
   if (!fs.existsSync(dir)) return null;
-  const w = new PackWriter();
+  const w = new PackWriter({ lod: true });
   const index = new Map();
   for (const cat of fs.readdirSync(dir)) {
     const d = path.join(dir, cat);
@@ -437,7 +441,7 @@ const PACKS_OPEN = '/*BITROPOLIS-PACKS*/', PACKS_CLOSE = '/*/BITROPOLIS-PACKS*/'
 // (familles L1–L8 et kit de voirie). Le reste (véhicules, sol, mobilier) vient du pack de ville.
 export function packCyber({ dir = CYBER_DIR } = {}) {
   if (!fs.existsSync(dir)) return null;
-  const w = new PackWriter();
+  const w = new PackWriter({ lod: true });
   for (const name of packModelNames()) {
     const obj = path.join(dir, name + '.obj');
     if (fs.existsSync(obj)) w.add(name, obj, objScale(name));
@@ -466,6 +470,7 @@ export function assetsScript() {
   if (city) packs.city = city;
   const cyber = packCyber() || previous.cyber;
   if (cyber) packs.cyber = cyber;
+  saveLodCache();
   for (const [k, p] of Object.entries(packs)) if (p === previous[k]) console.log(`ℹ️  Pack « ${k} » repris du dist/ existant (modèles d'origine absents).`);
   return Object.keys(packs).length ? `${PACKS_OPEN}const __BITROPOLIS_PACKS__ = ${JSON.stringify(packs)};${PACKS_CLOSE}` : '';
 }

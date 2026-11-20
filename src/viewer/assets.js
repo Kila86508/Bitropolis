@@ -2,6 +2,7 @@
 // en mémoire au démarrage, puis géométries three.js (position, couleur par sommet, lumière nocturne `aLit`).
 // Les données restent locales à ce module : rien n'est exposé dans la page ni proposé au téléchargement.
 import { obfName, obfXor } from '../core/obf.js';
+import { lodCluster, lodWorth, LOD_DEFAULT } from '../core/lod.js';
 
 /* global __BITROPOLIS_PACKS__ */
 const asSrc = (typeof __BITROPOLIS_PACKS__ !== 'undefined' && __BITROPOLIS_PACKS__) || null;
@@ -55,36 +56,23 @@ function asPack(pack, name) {
 }
 export function packModel(pack, name) { const P = asPack(pack, name); return (P && P.models[asKey(P, name)]) || null; }
 
-// Version simplifiée d'un modèle pour les objets lointains : les sommets sont regroupés sur une grille de
-// `cell` unités (un lot = 1 unité) — couleur et éclairage compris, donc chaque matériau garde ses couleurs —
-// et les triangles devenus plats ou en double disparaissent. Les gratte-ciel passent ainsi de ~27 000 à ~4 500
-// triangles. Renvoie null si le gain est trop faible pour valoir une seconde géométrie.
-export function packLodGeometry(pack, name, cell = 0.035) {
+// Version simplifiée d'un modèle pour les objets lointains (voir core/lod.js) : les sommets proches d'une même
+// couleur — éclairage compris, donc chaque matériau garde ses couleurs — sont fusionnés. Les gratte-ciel passent
+// ainsi de ~27 000 à ~4 500 triangles. Le réglage vient du pack (`l`, choisi à la construction pour qu'aucune
+// couche ne se plaque sur sa voisine) ; `l` = 0 ou un gain trop faible : pas de seconde géométrie (null).
+export function packLodGeometry(pack, name) {
   const P = asPack(pack, name);
   if (!P) return null;
-  const key = name + '~' + cell;
+  const key = name + '~lod';
   if (P.cache.has(key)) return P.cache.get(key);
-  const g = packGeometry(pack, name);
+  const m = P.models[asKey(P, name)], code = m && m.l !== undefined ? m.l : LOD_DEFAULT;
+  const g = code ? packGeometry(pack, name) : null;
   let out = null;
   if (g && g.index) {
     const pos = g.getAttribute('position').array, col = g.getAttribute('color').array, lit = g.getAttribute('aLit').array, role = g.getAttribute('aRole').array;
-    const I = g.index.array, n = pos.length / 3, rep = new Int32Array(n), keep = [];
-    const map = new Map();
-    for (let v = 0; v < n; v++) {
-      const k = `${Math.round(pos[v * 3] / cell)},${Math.round(pos[v * 3 + 1] / cell)},${Math.round(pos[v * 3 + 2] / cell)},${col[v * 3]},${col[v * 3 + 1]},${col[v * 3 + 2]},${lit[v]},${role[v]}`;
-      let r = map.get(k);
-      if (r === undefined) { r = keep.length; map.set(k, r); keep.push(v); }
-      rep[v] = r;
-    }
-    const idx = [], seen = new Set();
-    for (let i = 0; i < I.length; i += 3) {
-      const a = rep[I[i]], b = rep[I[i + 1]], c = rep[I[i + 2]];
-      if (a === b || b === c || a === c) continue;
-      const lo = Math.min(a, b, c), hi = Math.max(a, b, c), t = `${lo},${a + b + c - lo - hi},${hi}`;
-      if (seen.has(t)) continue;
-      seen.add(t); idx.push(a, b, c);
-    }
-    if (idx.length < I.length * 0.7) {
+    const I = g.index.array;
+    const { keep, idx } = lodCluster(pos, (v) => `${col[v * 3]},${col[v * 3 + 1]},${col[v * 3 + 2]},${lit[v]},${role[v]}`, I, code);
+    if (lodWorth(idx, I)) {
       const m = keep.length, p2 = new Float32Array(m * 3), c2 = new Float32Array(m * 3), l2 = new Float32Array(m), r2 = new Float32Array(m);
       keep.forEach((v, i) => {
         p2[i * 3] = pos[v * 3]; p2[i * 3 + 1] = pos[v * 3 + 1]; p2[i * 3 + 2] = pos[v * 3 + 2];

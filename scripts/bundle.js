@@ -15,6 +15,7 @@ const MODULES = [
   'src/core/catalog.js',
   'src/core/grid.js',
   'src/core/obf.js',
+  'src/core/lod.js',
   'src/viewer/assets.js',
   'src/viewer/i18n.js',
   'src/viewer/themes/lowpoly.js',
