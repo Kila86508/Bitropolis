@@ -9,6 +9,31 @@ import { gifPalette, GifEncoder, videoFormat, downloadBlob } from './export.js';
 import { t, tp, fmtNum, fmtBytes, kindLabel, kindRole, famName, modelName, applyI18n, getLang, setLang, UI_LANGS } from './i18n.js';
 
 const $ = (sel) => document.querySelector(sel);
+// Tracés SVG (grille de 24) du HUD : types de bâtiments, compteurs ; couleurs des bâtiments sur la mini-carte
+const UI_KIND_ICON = {
+  townhall: 'M3 21h18M5 21V10M9 21V10M15 21V10M19 21V10M3 10l9-6 9 6z',
+  tower: 'M6 21V4h12v17M4 21h16M9.5 8h1M13.5 8h1M9.5 12h1M13.5 12h1M10.5 21v-4h3v4',
+  shop: 'M3 9l2-5h14l2 5M3 9a3 3 0 0 0 6 0a3 3 0 0 0 6 0a3 3 0 0 0 6 0M5 12v8h14v-8M10 20v-4h4v4',
+  bank: 'M4 5h16v13H4zM7 18v2M17 18v2M9 11.5a3 3 0 1 0 6 0a3 3 0 1 0-6 0M12 10v3',
+  police: 'M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6zM9 12l2 2 4-4',
+  fire: 'M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z',
+  hospital: 'M5 4h14v16H5zM12 8v8M8 12h8',
+  library: 'M12 6c-2-1.5-5-2-8-2v14c3 0 6 .5 8 2 2-1.5 5-2 8-2V4c-3 0-6 .5-8 2zM12 6v14',
+  factory: 'M3 21V11l6 3.5V11l6 3.5V5h4v16H3z',
+  power: 'M13 2L5 13h6l-1 9 8-11h-6z',
+  warehouse: 'M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8',
+  park: 'M12 21v-7M7.5 14a4.5 4.5 0 0 1-1-8.5 5.5 5.5 0 0 1 11 0 4.5 4.5 0 0 1-1 8.5z'
+};
+const UI_STAT_ICON = {
+  buildings: 'M4 21V8l6-4v17M10 21V11h10v10M3 21h18M14 14h2M14 17h2M6.5 11h1M6.5 14h1M6.5 17h1',
+  lines: 'M4 6h16M4 10h10M4 14h13M4 18h8',
+  districts: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  roads: 'M7 21L9 3M17 21L15 3M12 5v3M12 11v3M12 17v3',
+  monuments: 'M12 3l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.4 6.7 19.1l1-5.8L3.5 9.2l5.9-.9z',
+  links: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1'
+};
+const UI_MINI_COLOR = { townhall: '#F5C95B', tower: '#5BA7E8', shop: '#F29BB2', bank: '#4CC2B0', police: '#3D6FD1', fire: '#E8644A', hospital: '#F3E6C8', library: '#B48AE0', factory: '#9AA7B5', power: '#F0B429', warehouse: '#C9A27A', park: '#3F9B57' };
+const uiSvg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"></path></svg>`;
 function uiEsc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 const uiNum = fmtNum, uiBytes = fmtBytes;
 function uiStars(t) { return '★'.repeat(t) + '☆'.repeat(5 - t); }
@@ -119,7 +144,11 @@ export class CityUI {
     this.analysis = null;
     this.themeId = defaultThemeId();
     applyI18n();
+    this._hudFit();
+    window.addEventListener('resize', () => this._hudFit());
+    this._help();
     this._bind();
+    setInterval(() => this._miniDraw(), 120);
     this._themes();
     this._langs();
   }
@@ -143,6 +172,7 @@ export class CityUI {
     sel.addEventListener('change', () => {
       setLang(sel.value);
       applyI18n();
+      this._help();
       this._fillThemes();
       if (this.analysis) { this._noEvolution = true; this.load(this.analysis); }
     });
@@ -153,8 +183,15 @@ export class CityUI {
     const toggle = (btn, fn) => {
       btn.addEventListener('click', () => { const on = !btn.classList.contains('on'); btn.classList.toggle('on', on); fn(on); });
     };
-    toggle($('#btn-night'), (on) => e.setNight(on));
-    e.onNightChange = (on) => $('#btn-night').classList.toggle('on', on); // le cycle automatique met le bouton à jour
+    // jour / nuit : deux boutons, que le cycle automatique met à jour
+    const dayNight = (on) => {
+      $('#btn-night').classList.toggle('on', on); $('#btn-night').setAttribute('aria-pressed', String(on));
+      $('#btn-day').classList.toggle('on', !on); $('#btn-day').setAttribute('aria-pressed', String(!on));
+    };
+    $('#btn-night').addEventListener('click', () => { e.setNight(true); dayNight(true); });
+    $('#btn-day').addEventListener('click', () => { e.setNight(false); dayNight(false); });
+    e.onNightChange = dayNight;
+    dayNight(false);
     toggle($('#btn-deps'), (on) => e.setDeps(on));
     toggle($('#btn-traffic'), (on) => e.setTraffic(on));
     toggle($('#btn-labels'), (on) => e.setLabels(on));
@@ -177,8 +214,10 @@ export class CityUI {
       ev.stopPropagation();
       if (!menu.hidden) { menu.hidden = true; return; }
       const r = $('#btn-shot').getBoundingClientRect();
-      menu.style.left = `${Math.max(8, Math.min(window.innerWidth - 240, r.left - 90))}px`;
-      menu.style.top = `${r.bottom + 8}px`;
+      // le bouton est en bas à droite : le menu s'ouvre au-dessus
+      menu.style.left = `${Math.max(8, Math.min(window.innerWidth - 284, r.right - 260))}px`;
+      menu.style.top = '';
+      menu.style.bottom = `${window.innerHeight - r.top + 12}px`;
       menu.hidden = false;
     });
     document.addEventListener('click', (ev) => { if (!ev.target.closest('#export-menu')) menu.hidden = true; });
@@ -201,9 +240,10 @@ export class CityUI {
       menu.hidden = true;
       if (!fxMenu.hidden) { fxMenu.hidden = true; return; }
       const r = $('#btn-fx').getBoundingClientRect();
-      fxMenu.style.left = `${Math.max(8, Math.min(window.innerWidth - 270, r.left - 90))}px`;
-      if (r.top > window.innerHeight / 2) { fxMenu.style.top = ''; fxMenu.style.bottom = `${window.innerHeight - r.top + 8}px`; }
-      else { fxMenu.style.bottom = ''; fxMenu.style.top = `${r.bottom + 8}px`; }
+      // le bouton est dans la colonne de droite : le menu s'ouvre à sa gauche
+      fxMenu.style.left = `${Math.max(8, r.left - 296)}px`;
+      fxMenu.style.bottom = '';
+      fxMenu.style.top = `${Math.max(8, Math.min(window.innerHeight - 300, r.top - 110))}px`;
       fxMenu.hidden = false;
     });
     document.addEventListener('click', (ev) => { if (!ev.target.closest('#fx-menu')) fxMenu.hidden = true; });
@@ -221,7 +261,14 @@ export class CityUI {
       if (entries.length) this._ingest(root, entries);
     });
     $('#welcome-demo').addEventListener('click', () => { const d = window.__BITROPOLIS_DEMO__; if (d) this.load(d); });
-    $('#legend-toggle').addEventListener('click', () => $('#legend').classList.toggle('collapsed'));
+    // guide « stades et routes », types de bâtiments, mini-carte
+    const guide = $('#guide'), guideBtn = $('#legend-toggle');
+    guideBtn.addEventListener('click', (ev) => { ev.stopPropagation(); guide.hidden = !guide.hidden; guideBtn.setAttribute('aria-expanded', String(!guide.hidden)); });
+    document.addEventListener('click', (ev) => { if (!ev.target.closest('#guide')) { guide.hidden = true; guideBtn.setAttribute('aria-expanded', 'false'); } });
+    $('#legend-items').addEventListener('click', (ev) => { const b = ev.target.closest('[data-kind]'); if (b) this._pickKind(b.dataset.kind); });
+    const mini = $('#minimap-canvas');
+    mini.addEventListener('pointerdown', (ev) => { mini.setPointerCapture(ev.pointerId); this._miniGo(ev); });
+    mini.addEventListener('pointermove', (ev) => { if (ev.buttons & 1) this._miniGo(ev); });
     $('#panel-close').addEventListener('click', () => this.select(null));
 
     // glisser-déposer un dossier n'importe où
@@ -332,6 +379,7 @@ export class CityUI {
         document.body.classList.add('has-city');
         this._stats(analysis, city);
         this._legend(analysis);
+        this._miniBuild();
         this.select(null);
         if (this._noEvolution) this._noEvolution = false; else this._evolution(analysis);
         document.title = `${analysis.name} — Bitropolis`;
@@ -372,27 +420,120 @@ export class CityUI {
   }
 
   _stats(a, city) {
-    $('#project-name').textContent = a.name;
-    const chips = [
-      ['🏢', uiNum(a.stats.files), t('stat.buildings')],
-      ['📝', uiNum(a.stats.loc), t('stat.lines')],
-      ['🏘️', uiNum(city.districts.length), t('stat.districts')],
-      ['🛣️', uiNum(city.roads.length), t('stat.roads')],
-      city.grid ? ['🗿', uiNum(city.roundabouts.length), t('stat.monuments')] : ['⭕', uiNum(city.roundabouts.length), t('stat.roundabouts')],
-      ['🔗', uiNum(a.stats.edges), t('stat.links')]
+    const name = $('#project-name');
+    name.textContent = a.name; name.title = a.name;
+    const rows = [
+      ['buildings', uiNum(a.stats.files), t('stat.buildings')], ['lines', uiNum(a.stats.loc), t('stat.lines')],
+      ['districts', uiNum(city.districts.length), t('stat.districts')], ['roads', uiNum(city.roads.length), t('stat.roads')],
+      ['monuments', uiNum(city.roundabouts.length), t(city.grid ? 'stat.monuments' : 'stat.roundabouts')], ['links', uiNum(a.stats.edges), t('stat.links')]
     ];
-    $('#stats').innerHTML = chips.map(([i, v, l]) => `<span class="chip" title="${l}">${i} <b>${v}</b> ${l}</span>`).join('');
+    $('#stats').innerHTML = rows.map(([i, v, l]) => `<div class="counter" title="${uiEsc(v + ' ' + l)}">${uiSvg(UI_STAT_ICON[i])}<span><b>${v}</b><small>${uiEsc(l)}</small></span></div>`).join('');
   }
 
+  // Barre du bas : un bouton par type de bâtiment présent dans la ville, et le guide « stades et routes »
   _legend(a) {
-    const counts = a.stats.kinds;
-    const item = (ic, key, sep) => `<li${sep ? ' class="sep"' : ''}><span class="ic">${ic}</span><span><b>${uiEsc(t(key + '.t'))}</b><small>${uiEsc(t(key + '.d'))}</small></span></li>`;
-    $('#legend-items').innerHTML = Object.entries(KINDS)
-      .filter(([k]) => counts[k])
-      .map(([k, v]) => `<li><span class="ic">${v.icon}</span><span><b>${uiEsc(kindLabel(k))}</b><small>${uiEsc(kindRole(k))}</small></span><em>${counts[k]}</em></li>`).join('') +
-      (this.engine.city && this.engine.city.grid
-        ? item('🏗️', 'lg.stages', true) + item('🛣️', 'lg.roads') + item('🗿', 'lg.monuments')
-        : item('⭐', 'lg.levels', true) + item('⭕', 'lg.rb'));
+    const counts = a.stats.kinds, kinds = Object.keys(KINDS).filter((k) => counts[k]);
+    $('#legend-items').innerHTML = kinds.map((k) => `<button type="button" class="type" data-kind="${k}" title="${uiEsc(kindRole(k))}">${uiSvg(UI_KIND_ICON[k] || UI_KIND_ICON.tower)}<span class="nm">${uiEsc(kindLabel(k))}</span><em>${uiNum(counts[k])}</em></button>`).join('');
+    this._pickKind(kinds.includes(this._kind) ? this._kind : kinds.slice().sort((x, y) => counts[y] - counts[x])[0]);
+    const grid = this.engine.city && this.engine.city.grid;
+    const part = (key, bars) => `<div><h4>${uiEsc(t(key + '.t'))}</h4>${bars ? `<div class="bars" aria-hidden="true">${[10, 15, 20, 25, 30, 35, 40, 46].map((h) => `<i style="height:${h}px"></i>`).join('')}</div>` : ''}<p>${uiEsc(t(key + '.d'))}</p></div>`;
+    $('#guide').innerHTML = grid ? part('lg.stages', true) + part('lg.roads') + part('lg.monuments') : part('lg.levels', true) + part('lg.rb');
+    $('#legend-toggle span:last-child').textContent = grid ? t('hud.guide') : `${t('lg.levels.t')} · ${t('lg.rb.t')}`;
+  }
+
+  // ---- HUD
+  // Le HUD est dessiné pour 1920 × 1080 : on le met à l'échelle de la fenêtre, puis on masque ce qui ne tient plus.
+  _hudFit() {
+    const w = window.innerWidth, h = window.innerHeight, z = Math.max(0.5, Math.min(1.25, w / 1920, h / 1000));
+    document.documentElement.style.setProperty('--hud-zoom', z.toFixed(3));
+    const vw = w / z, vh = h / z, c = document.body.classList;
+    c.toggle('hud-mid', vw < 1900);     // compteurs sans libellé
+    c.toggle('hud-narrow', vw < 1640);  // plus de compteurs
+    c.toggle('hud-compact', vw < 1240); // téléphone : ni mini-carte ni aide, barre défilante
+    c.toggle('hud-short', vh < 1000);
+  }
+
+  // Aide des gestes : « Glisser : tourner · … » → un mot-clé en gras par geste
+  _help() {
+    $('#help').innerHTML = t('help').split(' · ').map((s) => {
+      const i = s.search(/[:：]/);
+      return i < 0 ? `<span>${uiEsc(s)}</span>` : `<span><b>${uiEsc(s.slice(0, i).trim())}</b> ${uiEsc(s.slice(i + 1).trim())}</span>`;
+    }).join('');
+  }
+
+  // Type de bâtiment mis en avant dans la barre du bas
+  _pickKind(k) {
+    if (!k || !this.analysis) return;
+    this._kind = k;
+    const n = this.analysis.stats.kinds[k] || 0;
+    for (const b of document.querySelectorAll('#legend-items .type')) {
+      const on = b.dataset.kind === k;
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+    }
+    $('#sel-path').setAttribute('d', UI_KIND_ICON[k] || UI_KIND_ICON.tower);
+    $('#sel-name').textContent = kindLabel(k);
+    $('#sel-desc').textContent = kindRole(k);
+    $('#sel-count').textContent = `${uiNum(n)} ${t(n > 1 ? 'stat.buildings' : 'hud.b1')}`;
+  }
+
+  // Mini-carte : la ville vue du dessus (nord en haut), dessinée une fois par ville…
+  _miniBuild() {
+    const c = this.engine.city, cv = $('#minimap-canvas');
+    this._mini = null;
+    if (!c || !cv || !this.analysis) return;
+    const S = cv.width, base = document.createElement('canvas');
+    base.width = base.height = S;
+    const g = base.getContext('2d'), half = Math.max(20, (c.size || 100) / 2 + (c.ring || 0) + 6), k = S / (2 * half);
+    const X = (x) => S / 2 + x * k, Y = (z) => S / 2 + z * k;
+    g.fillStyle = '#A6D785'; g.fillRect(0, 0, S, S);
+    g.fillStyle = '#8CC8E8';
+    for (const w of c.water || []) g.fillRect(X(w.x) - 2.1 * k, Y(w.z) - 2.1 * k, 4.2 * k, 4.2 * k);
+    g.strokeStyle = '#EDF1F4'; g.lineCap = 'round';
+    for (const r of c.roads || []) {
+      if (r.x1 === undefined) continue;
+      g.lineWidth = Math.max(2, (r.w || 1.6) * k * 1.5);
+      g.beginPath(); g.moveTo(X(r.x1), Y(r.z1)); g.lineTo(X(r.x2), Y(r.z2)); g.stroke();
+    }
+    for (const f of this.analysis.files) {
+      const lot = c.lots[f.id];
+      if (!lot || lot.x === undefined) continue;
+      const s = Math.max(4, (lot.size || 3) * k * 0.86);
+      g.fillStyle = UI_MINI_COLOR[f.kind] || '#F3E6C8';
+      g.beginPath();
+      if (g.roundRect) g.roundRect(X(lot.x) - s / 2, Y(lot.z) - s / 2, s, s, Math.min(3, s / 3)); else g.rect(X(lot.x) - s / 2, Y(lot.z) - s / 2, s, s);
+      g.fill();
+    }
+    this._mini = { base, half, k, S };
+    this._miniDraw();
+  }
+  // … puis, plusieurs fois par seconde, le champ de vision : là où les quatre coins de l'écran touchent le sol
+  _miniDraw() {
+    const m = this._mini;
+    if (!m || !document.body.classList.contains('has-city') || document.body.classList.contains('hud-compact')) return;
+    const g = $('#minimap-canvas').getContext('2d'), e = this.engine, cam = e.camera, S = m.S;
+    g.drawImage(m.base, 0, 0);
+    const reach = e.controls.radius * 3 + 60;
+    const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => {
+      const d = new THREE.Vector3(x, y, 0.5).unproject(cam).sub(cam.position).normalize();
+      const far = Math.min(d.y < -0.01 ? -cam.position.y / d.y : Infinity, reach);
+      return [S / 2 + (cam.position.x + d.x * far) * m.k, S / 2 + (cam.position.z + d.z * far) * m.k];
+    });
+    g.beginPath();
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.closePath();
+    g.fillStyle = 'rgba(255, 255, 255, 0.22)'; g.fill();
+    g.lineWidth = 5; g.lineJoin = 'round'; g.strokeStyle = '#fff'; g.stroke();
+  }
+  // un clic (ou un glissé) sur la mini-carte y amène la vue
+  _miniGo(ev) {
+    const m = this._mini;
+    if (!m) return;
+    const r = $('#minimap-canvas').getBoundingClientRect(), b = 6 / 196; // bordure blanche
+    const u = ((ev.clientX - r.left) / r.width - b) / (1 - 2 * b), v = ((ev.clientY - r.top) / r.height - b) / (1 - 2 * b);
+    const c = this.engine.controls;
+    c.goal.target.set((u - 0.5) * 2 * m.half, 0, (v - 0.5) * 2 * m.half);
+    c.clampTarget();
+    c.autoRotate = false;
   }
 
   _tooltip(hit, x, y) {
