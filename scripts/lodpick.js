@@ -1,16 +1,15 @@
-// Bitropolis — choix du réglage de simplification (affichage lointain) de chaque modèle, à la construction du pack.
-// Pour chaque réglage candidat (core/lod.js), on simplifie le modèle et on mesure la surface où deux couches de
-// couleurs différentes se retrouvent dans le même plan en étant visibles : c'est ce qui scintille à l'écran.
-// On garde le réglage le plus économe en triangles qui reste sous le seuil ; si aucun n'y arrive, le modèle
-// n'a pas de version simplifiée (code 0).
+// Bitropolis — garde-fou de la version simplifiée (affichage lointain), à la construction du pack.
+// On mesure, sur le modèle complet puis sur sa version simplifiée (core/lod.js), la surface où deux couches de
+// couleurs différentes se recouvrent dans le même plan ou à quelques centimètres : c'est ce qui clignote à
+// l'écran. Si la version simplifiée fait moins bien que le modèle complet, le modèle n'en aura pas (champ l = 0).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { LOD_CELLS, LOD_RULES, lodCode, lodCluster, lodWorth } from '../src/core/lod.js';
+import { lodPieces, lodWorth } from '../src/core/lod.js';
 
-export const LOD_MAX_CONFLICT = 0.003; // surface tolérée, en unités² de modèle (un lot = 1 : soit 0,3 % d'un lot)
-const TOL = 4e-4;                      // deux faces à moins de 0,4 millième de lot sont « dans le même plan »
+export const LOD_GAP = 0.004;        // deux couches à moins de 4 cm (unités de modèle : un lot = 1 = 10 m) se gênent de loin
+export const LOD_MAX_WORSE = 0.003;  // surface en conflit tolérée en plus du modèle complet (0,3 % d'un lot)
 
 const area2 = (P) => { let a = 0; for (let k = 0; k < P.length; k++) { const p = P[k], q = P[(k + 1) % P.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
 // intersection de deux polygones convexes 2D (clipper en sens direct)
@@ -45,11 +44,11 @@ function blocked(T, o, d) {
   return false;
 }
 
-// Surface (unités² de modèle) où deux triangles de couleurs différentes, tournés du même côté, partagent un plan
-// en restant visibles. On ne regarde que les faces alignées sur les axes, vers le haut ou sur les côtés (les
-// dessous sont cachés par leur propre volume) ; « visible » = un rayon peut s'en échapper sans passer sous le sol.
-// pos : positions ; col : couleur par sommet ; idx : triangles.
-export function visibleConflict(pos, col, idx) {
+// Surface (unités² de modèle) où deux triangles de couleurs différentes, tournés du même côté, se recouvrent à
+// moins de `gap` l'un de l'autre, le plus extérieur étant visible (un rayon peut s'en échapper sans passer sous
+// le sol). Seules les faces alignées sur les axes sont mesurées, vers le haut ou sur les côtés : les dessous
+// sont cachés par leur propre volume. pos : positions ; col : couleur par sommet ; idx : triangles.
+export function layerConflict(pos, col, idx, gap = LOD_GAP) {
   const groups = new Map(), T = new Float64Array(idx.length * 3);
   for (let i = 0; i < idx.length; i++) { T[i * 3] = pos[idx[i] * 3]; T[i * 3 + 1] = pos[idx[i] * 3 + 1]; T[i * 3 + 2] = pos[idx[i] * 3 + 2]; }
   for (let i = 0; i < idx.length; i += 3) {
@@ -60,7 +59,7 @@ export function visibleConflict(pos, col, idx) {
     const N = [nx / len, ny / len, nz / len];
     for (let ax = 0; ax < 3; ax++) {
       if (Math.abs(N[ax]) < 0.999 || (ax === 1 && N[ax] < 0)) continue;
-      const u = (ax + 1) % 3, w = (ax + 2) % 3, key = `${ax}${N[ax] > 0 ? '+' : '-'}${Math.round(pos[a + ax] / TOL)}`;
+      const u = (ax + 1) % 3, w = (ax + 2) % 3, key = `${ax}${N[ax] > 0 ? '+' : '-'}`;
       const P = [[pos[a + u], pos[a + w]], [pos[b + u], pos[b + w]], [pos[c + u], pos[c + w]]];
       if (area2(P) < 0) P.reverse();
       let L = groups.get(key);
@@ -71,20 +70,21 @@ export function visibleConflict(pos, col, idx) {
   let total = 0;
   for (const [key, L] of groups) {
     const ax = +key[0], sg = key[1] === '+' ? 1 : -1, u = (ax + 1) % 3, w = (ax + 2) % 3, found = [];
-    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+    L.sort((p, q) => p.h - q.h);
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length && L[j].h - L[i].h < gap; j++) {
       const A = L[i], B = L[j];
       if (A.c === B.c || A.x1 <= B.x0 || B.x1 <= A.x0 || A.y1 <= B.y0 || B.y1 <= A.y0) continue;
       const I = clip(B.P, A.P);
       if (I.length < 3) continue;
       const ar = Math.abs(area2(I));
-      if (ar > 1e-7) found.push({ ar, cx: I.reduce((s, p) => s + p[0], 0) / I.length, cy: I.reduce((s, p) => s + p[1], 0) / I.length, h: Math.max(A.h, B.h) });
+      if (ar > 1e-7) found.push({ ar, cx: I.reduce((s, p) => s + p[0], 0) / I.length, cy: I.reduce((s, p) => s + p[1], 0) / I.length, h: sg > 0 ? B.h : A.h });
     }
     if (!found.length) continue;
-    // visibilité estimée sur les plus grands recouvrements du plan, puis appliquée à toute sa surface en conflit
+    // visibilité estimée sur les plus grands recouvrements de cette orientation, puis appliquée à toute leur surface
     found.sort((p, q) => q.ar - p.ar);
     const sum = found.reduce((s, f) => s + f.ar, 0);
     let seen = 0, tested = 0;
-    for (const f of found.slice(0, 10)) {
+    for (const f of found.slice(0, 12)) {
       const o = [0, 0, 0];
       o[ax] = f.h + sg * 2e-4; o[u] = f.cx; o[w] = f.cy;
       let free = false;
@@ -102,16 +102,14 @@ export function visibleConflict(pos, col, idx) {
   return total;
 }
 
-// Géométrie simplifiée d'un modèle pour un réglage donné (mêmes tableaux que la visionneuse).
-export function simplify(pos, col, idx, code) {
-  const { keep, idx: I } = lodCluster(pos, (v) => col[v], idx, code);
-  const p = new Float32Array(keep.length * 3), c = new Array(keep.length);
-  keep.forEach((v, i) => { p[i * 3] = pos[v * 3]; p[i * 3 + 1] = pos[v * 3 + 1]; p[i * 3 + 2] = pos[v * 3 + 2]; c[i] = col[v]; });
-  return { pos: p, col: c, idx: I, worth: lodWorth(I, idx) };
+// Version simplifiée d'un modèle, dans les mêmes tableaux que la visionneuse. lit : éclairage par sommet.
+export function simplify(pos, col, idx, lit = null) {
+  const L = lodPieces(pos, (v) => col[v], idx, lit ? (v) => lit[v] >= 2 : null);
+  return { pos: L.pos, col: L.src.map((v) => col[v]), idx: L.idx, worth: lodWorth(L.idx, idx) };
 }
 
-// Réglages déjà calculés, gardés d'une construction à l'autre (clé : empreinte de la géométrie).
-const CACHE_FILE = path.join(os.tmpdir(), 'bitropolis-lod-v1.json');
+// Résultats déjà calculés, gardés d'une construction à l'autre (clé : empreinte de la géométrie).
+const CACHE_FILE = path.join(os.tmpdir(), 'bitropolis-lod-v2.json');
 let cache = null, dirty = false;
 function loadCache() {
   if (!cache) { try { cache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8')); } catch { cache = {}; } }
@@ -122,9 +120,9 @@ export function saveLodCache() {
   try { fs.writeFileSync(CACHE_FILE, JSON.stringify(cache)); dirty = false; } catch { /* cache facultatif */ }
 }
 
-// P : positions entières du pack (Int16), s : pas de quantification, C : indice de couleur par sommet, I : triangles.
-// Renvoie le code du réglage retenu (core/lod.js), ou 0 si le modèle ne doit pas être simplifié.
-export function chooseLod(P, s, C, I, { useCache = true } = {}) {
+// P : positions entières du pack (Int16), s : pas de quantification, C : indice de couleur par sommet, I : triangles,
+// litOf(c) : éclairage de la couleur c. Renvoie 1 si le modèle peut être simplifié de loin, 0 sinon.
+export function lodAllowed(P, s, C, I, litOf = () => 0, { useCache = true } = {}) {
   let key = null;
   if (useCache) {
     const h = crypto.createHash('sha1');
@@ -133,17 +131,12 @@ export function chooseLod(P, s, C, I, { useCache = true } = {}) {
     const hit = loadCache()[key];
     if (hit !== undefined) return hit;
   }
-  // mêmes positions que dans la visionneuse (Float32), pour que les sommets tombent dans les mêmes cellules
-  const pos = new Float32Array(P.length);
+  // mêmes positions que dans la visionneuse (Float32)
+  const pos = new Float32Array(P.length), lit = new Uint8Array(C.length);
   for (let k = 0; k < P.length; k++) pos[k] = P[k] * s;
-  let best = 0, bestTris = Infinity;
-  for (let ci = 0; ci < LOD_CELLS.length && !best; ci++) {
-    for (let ri = 0; ri < LOD_RULES.length; ri++) {
-      const code = lodCode(ci, ri), L = simplify(pos, C, I, code);
-      if (!L.worth || L.idx.length >= bestTris) continue;
-      if (visibleConflict(L.pos, L.col, L.idx) <= LOD_MAX_CONFLICT) { best = code; bestTris = L.idx.length; }
-    }
-  }
-  if (key) { loadCache()[key] = best; dirty = true; }
-  return best;
+  for (let v = 0; v < C.length; v++) lit[v] = litOf(C[v]);
+  const L = simplify(pos, C, I, lit);
+  const ok = !L.worth || layerConflict(L.pos, L.col, L.idx) <= layerConflict(pos, C, I) + LOD_MAX_WORSE ? 1 : 0;
+  if (key) { loadCache()[key] = ok; dirty = true; }
+  return ok;
 }

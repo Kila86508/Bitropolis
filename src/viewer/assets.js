@@ -2,7 +2,7 @@
 // en mémoire au démarrage, puis géométries three.js (position, couleur par sommet, lumière nocturne `aLit`).
 // Les données restent locales à ce module : rien n'est exposé dans la page ni proposé au téléchargement.
 import { obfName, obfXor } from '../core/obf.js';
-import { lodCluster, lodWorth, LOD_DEFAULT } from '../core/lod.js';
+import { lodPieces, lodWorth } from '../core/lod.js';
 
 /* global __BITROPOLIS_PACKS__ */
 const asSrc = (typeof __BITROPOLIS_PACKS__ !== 'undefined' && __BITROPOLIS_PACKS__) || null;
@@ -56,35 +56,35 @@ function asPack(pack, name) {
 }
 export function packModel(pack, name) { const P = asPack(pack, name); return (P && P.models[asKey(P, name)]) || null; }
 
-// Version simplifiée d'un modèle pour les objets lointains (voir core/lod.js) : les sommets proches d'une même
-// couleur — éclairage compris, donc chaque matériau garde ses couleurs — sont fusionnés. Les gratte-ciel passent
-// ainsi de ~27 000 à ~4 500 triangles. Le réglage vient du pack (`l`, choisi à la construction pour qu'aucune
-// couche ne se plaque sur sa voisine) ; `l` = 0 ou un gain trop faible : pas de seconde géométrie (null).
+// Version simplifiée d'un modèle pour les objets lointains (voir core/lod.js) : chaque pièce est allégée sans
+// qu'aucune surface ne bouge (pavés sans chanfrein, pièces minces réduites à leurs grandes faces, petites pièces
+// retirées), et garde sa couleur et son éclairage. `l` = 0 dans le pack (la construction a mesuré que la version
+// simplifiée ferait moins bien que le modèle complet) ou gain trop faible : pas de seconde géométrie (null).
 export function packLodGeometry(pack, name) {
   const P = asPack(pack, name);
   if (!P) return null;
   const key = name + '~lod';
   if (P.cache.has(key)) return P.cache.get(key);
-  const m = P.models[asKey(P, name)], code = m && m.l !== undefined ? m.l : LOD_DEFAULT;
-  const g = code ? packGeometry(pack, name) : null;
+  const m = P.models[asKey(P, name)];
+  const g = m && m.l !== 0 ? packGeometry(pack, name) : null;
   let out = null;
   if (g && g.index) {
     const pos = g.getAttribute('position').array, col = g.getAttribute('color').array, lit = g.getAttribute('aLit').array, role = g.getAttribute('aRole').array;
     const I = g.index.array;
-    const { keep, idx } = lodCluster(pos, (v) => `${col[v * 3]},${col[v * 3 + 1]},${col[v * 3 + 2]},${lit[v]},${role[v]}`, I, code);
-    if (lodWorth(idx, I)) {
-      const m = keep.length, p2 = new Float32Array(m * 3), c2 = new Float32Array(m * 3), l2 = new Float32Array(m), r2 = new Float32Array(m);
-      keep.forEach((v, i) => {
-        p2[i * 3] = pos[v * 3]; p2[i * 3 + 1] = pos[v * 3 + 1]; p2[i * 3 + 2] = pos[v * 3 + 2];
+    // lampes et feux (aLit ≥ 2) : gardés même minuscules, ils s'allument la nuit
+    const L = lodPieces(pos, (v) => `${col[v * 3]},${col[v * 3 + 1]},${col[v * 3 + 2]},${lit[v]},${role[v]}`, I, (v) => lit[v] >= 2);
+    if (lodWorth(L.idx, I)) {
+      const n = L.src.length, c2 = new Float32Array(n * 3), l2 = new Float32Array(n), r2 = new Float32Array(n);
+      L.src.forEach((v, i) => {
         c2[i * 3] = col[v * 3]; c2[i * 3 + 1] = col[v * 3 + 1]; c2[i * 3 + 2] = col[v * 3 + 2];
         l2[i] = lit[v]; r2[i] = role[v];
       });
       out = new THREE.BufferGeometry();
-      out.setAttribute('position', new THREE.BufferAttribute(p2, 3));
+      out.setAttribute('position', new THREE.BufferAttribute(new Float32Array(L.pos), 3));
       out.setAttribute('color', new THREE.BufferAttribute(c2, 3));
       out.setAttribute('aLit', new THREE.BufferAttribute(l2, 1));
       out.setAttribute('aRole', new THREE.BufferAttribute(r2, 1));
-      out.setIndex(new THREE.BufferAttribute(m > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
+      out.setIndex(new THREE.BufferAttribute(n > 65535 ? new Uint32Array(L.idx) : new Uint16Array(L.idx), 1));
       out.computeVertexNormals();
       out.computeBoundingSphere();
     }

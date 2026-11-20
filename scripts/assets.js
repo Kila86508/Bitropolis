@@ -8,7 +8,7 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { packModelNames, PROPS, KIT_PROPS, objScale } from '../src/core/catalog.js';
-import { chooseLod, saveLodCache } from './lodpick.js';
+import { lodAllowed, saveLodCache } from './lodpick.js';
 import { obfName, obfXor } from '../src/core/obf.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -269,7 +269,8 @@ export function encode16(src, stride) {
 
 // --- Un pack = plusieurs modèles partageant une palette, sérialisés dans un seul binaire gzip.
 class PackWriter {
-  // lod : choisir pour chaque modèle le réglage de sa version simplifiée (affichage lointain), voir lodpick.js
+  // lod : vérifier pour chaque modèle que sa version simplifiée (affichage lointain) ne fait pas clignoter des
+  // couches que le modèle complet tient à distance ; sinon le noter sans version simplifiée (l = 0), voir lodpick.js
   constructor({ lod = false } = {}) { this.palette = []; this.paletteIndex = new Map(); this.chunks = []; this.size = 0; this.models = {}; this.seen = new Map(); this.lod = lod; }
   // role : matériau recolorable du pack (0 aucun, 1–3 murs, 4 toit, 5 boiseries, 6 accent)
   color(r, g, b, lit, role = 0) {
@@ -348,7 +349,7 @@ class PackWriter {
     if (this.palette.length > 65535) throw new Error('Palette trop grande');
     this.models[name] = { n: nv, m: ni, s, e: 1, p: this.push(encode16(P, 3)), c: this.push(encode16(C, 1)), i: this.push(encode16(I, 1)), min: min.map((x) => +x.toFixed(4)), max: max.map((x) => +x.toFixed(4)) };
     // même seuil que la visionneuse (150 triangles) : en dessous, le modèle n'a jamais de version simplifiée
-    if (this.lod && !name.includes('#') && ni / 3 >= 150) this.models[name].l = chooseLod(P, s, C, I);
+    if (this.lod && !name.includes('#') && ni / 3 >= 150 && !lodAllowed(P, s, C, I, (c) => this.palette[c][3])) this.models[name].l = 0;
     return true;
   }
   // Sérialise le pack : gzip puis brouillage (sel aléatoire par build), noms de modèles remplacés par des empreintes.
