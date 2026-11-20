@@ -164,7 +164,10 @@ Los enlaces entre archivos se detectan en **JavaScript / TypeScript** (ESM, Comm
 |---|---|
 | 🏙️ Ciudad 3D (cuadrícula, edificios que crecen, tráfico) | ✅ por defecto |
 | 🔺 Low poly (edificios procedurales) | ✅ disponible |
-| 🏰 Medieval · 👾 Pixel art · 🌃 Cyberpunk · ⛩️ Japón | 🔜 próximamente |
+| 🌃 Cyberpunk (neones, siempre de noche) | ✅ disponible |
+| 🏰 Medieval · 👾 Pixel art · ⛩️ Japón | 🔜 próximamente |
+
+<p align="center"><img src="docs/cyberpunk.jpg" alt="El tema Cyberpunk"><br><sub>🌃 El tema Cyberpunk: la misma ciudad, en neón, de noche.</sub></p>
 
 <p align="center"><img src="docs/lowpoly.jpg" width="70%" alt="El tema low poly"><br><sub>El tema low poly.</sub></p>
 
@@ -208,7 +211,8 @@ npm run build    # regenera dist/bitropolis.html
 - [ ] Historial de Git: ver cómo se construye la ciudad commit a commit
 - [ ] Modo «paseo» en primera persona
 - [ ] Clima según el estado del proyecto (TODO, tests que fallan…)
-- [ ] Temas medieval, pixel art y cyberpunk
+- [x] Tema cyberpunk
+- [ ] Temas medieval y pixel art
 
 ## 📄 Licencia
 

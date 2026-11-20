@@ -17,6 +17,8 @@ export const PROPS_DIR = path.join(ROOT, 'Asset/Maison/obj free city pack');
 export const ROAD_KIT_DIR = path.join(ROOT, 'Asset/Maison/road/PLUS/gltf');
 export const NEW_MODELS_DIR = path.join(ROOT, 'Asset/export_obj');
 export const NEW_VARIANTS_DIR = path.join(ROOT, 'Asset/export_obj_variantes');
+// thème Cyberpunk : mêmes noms de modèles que Asset/export_obj, en version néon
+export const CYBER_DIR = path.join(ROOT, 'Asset/export_obj_cyberpunk');
 
 // --- Décodeur PNG minimal (8 bits, non entrelacé : gris, RGB, palette, RGBA)
 export function decodePNG(buf) {
@@ -185,11 +187,13 @@ export function readGLB(file) {
   return { prims, parts, fx };
 }
 
-// Éclairage d'un matériau .obj : lentilles de feux (3–8, d'après l'axe de leur tête), lampes (2), fenêtres (1), façades vitrées (9).
+// Éclairage d'un matériau .obj : lentilles de feux (3–8, d'après l'axe de leur tête), lampes (2), fenêtres (1),
+// façades vitrées (9), néons qui brillent dans leur propre couleur (10).
 const OBJ_LENS = /(^|_)fl_(red|green|yel)$/i;
 function objLit(key) {
   const lens = /(?:^|_)fl_(red|green|yel)\|([XY])$/i.exec(key);
   if (lens) return (lens[2] === 'X' ? 3 : 6) + { red: 0, green: 1, yel: 2 }[lens[1].toLowerCase()];
+  if (/neon/i.test(key)) return 10;
   if (/light|lamp|bulb/i.test(key) && !/pole|post|base/i.test(key)) return 2;
   if (/(^|_)win$/i.test(key)) return 1;
   if (/glass/i.test(key)) return 9; // façade vitrée : éclairage de nuit plus doux
@@ -429,6 +433,18 @@ export function packCity({ dir = CITY_PACK_DIR } = {}) {
 
 // Packs déjà chiffrés dans un HTML construit précédemment (permet de reconstruire sans les .glb d'origine).
 const PACKS_OPEN = '/*BITROPOLIS-PACKS*/', PACKS_CLOSE = '/*/BITROPOLIS-PACKS*/';
+// Pack du thème Cyberpunk : les modèles de Asset/export_obj_cyberpunk portant un nom utilisé par la ville
+// (familles L1–L8 et kit de voirie). Le reste (véhicules, sol, mobilier) vient du pack de ville.
+export function packCyber({ dir = CYBER_DIR } = {}) {
+  if (!fs.existsSync(dir)) return null;
+  const w = new PackWriter();
+  for (const name of packModelNames()) {
+    const obj = path.join(dir, name + '.obj');
+    if (fs.existsSync(obj)) w.add(name, obj, objScale(name));
+  }
+  return Object.keys(w.models).length ? w.finish() : null;
+}
+
 export function packsFromHTML(file = path.join(ROOT, 'dist/bitropolis.html')) {
   try {
     const html = fs.readFileSync(file, 'utf8');
@@ -448,6 +464,8 @@ export function assetsScript() {
   if (land) packs.landscape = land;
   const city = packCity() || previous.city;
   if (city) packs.city = city;
+  const cyber = packCyber() || previous.cyber;
+  if (cyber) packs.cyber = cyber;
   for (const [k, p] of Object.entries(packs)) if (p === previous[k]) console.log(`ℹ️  Pack « ${k} » repris du dist/ existant (modèles d'origine absents).`);
   return Object.keys(packs).length ? `${PACKS_OPEN}const __BITROPOLIS_PACKS__ = ${JSON.stringify(packs)};${PACKS_CLOSE}` : '';
 }

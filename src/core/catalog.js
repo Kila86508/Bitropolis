@@ -16,13 +16,14 @@ export const VARIANTS = {
               // gratte-ciel (onze silhouettes)
               [0.45, L('TourAiguille')], [0.45, L('TourArche')], [0.45, L('TourBoucle')], [0.45, L('TourDeco')], [0.45, L('TourEclat')], [0.45, L('TourHyper')], [0.45, L('TourJumelles')], [0.45, L('TourOeuf')], [0.45, L('TourPagode')], [0.45, L('TourTorsade')], [0.45, L('TourTubes')]],
   shop:      [[2.5, N('Commercial', 1, 6)], [2.5, L('Commercial')], [2, L('Cinema')], [2, L('Restaurant')], [1.5, L('Hotel')],
-              [0.8, N('Theater', 1, 5)], [0.3, N('Opera', 1, 4)], [0.6, N('Residential', 2, 8)]],
-  bank:      [[2, N('Office', 1, 6)], [2, L('Office')], [2.5, L('Banque')], [1.2, N('Research', 1, 4)], [0.6, N('Residential_Block', 2, 8)]],
+              [0.8, N('Theater', 1, 5)], [0.3, N('Opera', 1, 4)], [0.6, N('Residential', 2, 8)], [1, L('Stade')]],
+  bank:      [[2, N('Office', 1, 6)], [2, L('Office')], [2.5, L('Banque')], [1.2, N('Research', 1, 4)], [0.6, N('Residential_Block', 2, 8)],
+              [1, L('Observatoire')]],
   police:    [[3, N('Police', 1, 5)], [3, L('Police')], [0.4, N('Prison', 1, 3)]],
   fire:      [[2.5, N('Fire', 1, 5)], [2.5, L('FireStation')], [2, L('Gare')], [1, N('Transit', 1, 4)]],
   hospital:  [[2, [...N('Clinic', 1, 4), 'Hospital_N3', 'Hospital_N4']], [2, L('Hospital')], [1, N('Hospital', 1, 4)]],
   library:   [[2, [...N('Library', 1, 4), 'University_N2', 'University_N4']], [1.2, L('ClockTower')], [1.6, N('School', 1, 5)], [0.6, N('University', 1, 4)],
-              [2, L('Ecole')], [1.5, L('Eglise')]],
+              [2, L('Ecole')], [1.5, L('Eglise')], [1.2, L('Chateau')]],
   factory:   [[2, [...N('Light_Industry', 1, 5), 'Heavy_Industry_N4', 'Heavy_Industry_N5', 'Industrial_Complex_N5']],
               [1.2, N('Light_Industrial_Complex', 1, 5)], [0.9, N('Heavy_Industry', 1, 5)],
               // usines (aciérie, scierie, chimie, high-tech, textile)
@@ -34,7 +35,7 @@ export const VARIANTS = {
   park:      [[3, ['@grove', '@grove2', ...N('Park', 1, 4), 'Park_N6', 'Park_N8']], [1, ['@grove2', 'Park_N1', 'Park_N3', 'Park_N5', 'Park_N7']],
               [1.5, L('Fountain')], [1, L('Memorial')],
               // jardins naturels : parc, jardin, aire de jeux
-              [1.6, L('Parc')], [1.4, L('Jardin')], [1.2, L('AireJeux')]]
+              [1.6, L('Parc')], [1.4, L('Jardin')], [1.2, L('AireJeux')], [1, L('Musee')], [1, L('Piscine')]]
 };
 // Chaîne principale de chaque type (compatibilité)
 export const CHAINS = Object.fromEntries(Object.entries(VARIANTS).map(([k, v]) => [k, v[0][1]]));
@@ -47,8 +48,10 @@ function ctHash(s, seed = 0x811c9dc5) {
   return (h >>> 0) / 4294967296;
 }
 // Chaîne d'un fichier : tirée parmi les variantes de son type, d'après son chemin
-export function chainOf(f) {
-  const vars = VARIANTS[f.kind] || VARIANTS.tower;
+// keep(chain) : ne garder que certaines chaînes (thème Cyberpunk : celles qui existent en version néon)
+export function chainOf(f, keep = null) {
+  let vars = VARIANTS[f.kind] || VARIANTS.tower;
+  if (keep) { const k = vars.filter(([, c]) => keep(c)); if (k.length) vars = k; }
   if (vars.length === 1 || !f.path) return vars[0][1];
   let r = ctHash(f.path + '|' + f.kind) * vars.reduce((t, v) => t + v[0], 0);
   for (const [w, chain] of vars) { if ((r -= w) < 0) return chain; }
@@ -69,6 +72,7 @@ export const FAMILY_NAMES = {
   Banque_L: 'Banque', Centrale_L: 'Centrale électrique', Cinema_L: 'Cinéma', Ecole_L: 'École', Eglise_L: 'Église', Gare_L: 'Gare',
   Hotel_L: 'Hôtel', ParkingA_L: 'Parking', ParkingB_L: 'Parking', ParkingC_L: 'Parking', Police_L: 'Commissariat', Restaurant_L: 'Restaurant',
   Parc_L: 'Parc', Jardin_L: 'Jardin', AireJeux_L: 'Aire de jeux',
+  Chateau_L: 'Château', Musee_L: 'Musée', Observatoire_L: 'Observatoire', Piscine_L: 'Piscine', Stade_L: 'Stade',
   Usine_Acier_L: 'Aciérie', Usine_Bois_L: 'Scierie', Usine_Chimie_L: 'Usine chimique', Usine_Tech_L: 'Usine high-tech', Usine_Textile_L: 'Usine textile',
   TourAiguille_L: 'Tour Aiguille', TourArche_L: 'Tour Arche', TourBoucle_L: 'Tour Boucle', TourDeco_L: 'Tour Déco', TourEclat_L: 'Tour Éclat', TourHyper_L: 'Tour Hyper', TourJumelles_L: 'Tours jumelles', TourOeuf_L: 'Tour Œuf', TourPagode_L: 'Tour Pagode', TourTorsade_L: 'Tour Torsade', TourTubes_L: 'Tour Tubes'
 };
@@ -190,8 +194,8 @@ const pointsAt = (level) => G_BASE * (Math.pow(2, level * G_SPAN) - 1);
 // → { model, stage (1..stages), stages, family, name, points, next (points du stade suivant ou null) }
 // Chaque fichier a ses propres seuils (±25 %, d'après son chemin) : deux fichiers de même taille
 // ne sont pas forcément au même stade, mais un fichier donné grandit toujours de la même façon.
-export function growthOf(f, points = growthPoints(f)) {
-  const chain = chainOf(f);
+export function growthOf(f, points = growthPoints(f), keep = null) {
+  const chain = chainOf(f, keep);
   const n = chain.length;
   const jit = f.path ? 0.75 + 0.5 * ctHash(f.path, 0x9e3779b9) : 1;
   let idx = Math.min(n - 1, Math.floor(levelOf(points * jit) * n));
@@ -213,7 +217,7 @@ export function modelLabel(model) {
 
 // Version du catalogue : à incrémenter quand les chaînes changent (sinon des changements de famille
 // passeraient pour de la croissance au rechargement).
-export const CATALOG_VERSION = 5;
+export const CATALOG_VERSION = 6;
 
 // Instantané compact d'une ville (chemin → [modèle, stade, points]) pour repérer ce qui a grandi.
 export function growthSnapshot(files, at = null) {

@@ -164,7 +164,10 @@ Les liens entre fichiers sont détectés pour **JavaScript / TypeScript** (ESM, 
 |---|---|
 | 🏙️ Ville 3D (grille, bâtiments à stades, circulation) | ✅ par défaut |
 | 🔺 Low poly (bâtiments procéduraux) | ✅ disponible |
-| 🏰 Médiéval · 👾 Pixel art · 🌃 Cyberpunk · ⛩️ Japon | 🔜 bientôt |
+| 🌃 Cyberpunk (néons, nuit permanente) | ✅ disponible |
+| 🏰 Médiéval · 👾 Pixel art · ⛩️ Japon | 🔜 bientôt |
+
+<p align="center"><img src="docs/cyberpunk.jpg" alt="Le thème Cyberpunk"><br><sub>🌃 Le thème Cyberpunk : la même ville, en néons, de nuit.</sub></p>
 
 <p align="center"><img src="docs/lowpoly.jpg" width="70%" alt="Le thème low poly"><br><sub>Le thème low poly.</sub></p>
 
@@ -208,7 +211,8 @@ npm run build    # régénère dist/bitropolis.html
 - [ ] Historique Git : voir la ville se construire commit après commit
 - [ ] Mode « visite » à la première personne
 - [ ] Météo selon l'état du projet (TODO, tests qui échouent…)
-- [ ] Thèmes médiéval, pixel art, cyberpunk
+- [x] Thème cyberpunk
+- [ ] Thèmes médiéval, pixel art
 
 ## 📄 Licence
 

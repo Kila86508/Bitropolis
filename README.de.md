@@ -164,7 +164,10 @@ Verknüpfungen zwischen Dateien werden erkannt für **JavaScript / TypeScript** 
 |---|---|
 | 🏙️ 3D-Stadt (Raster, wachsende Gebäude, Verkehr) | ✅ Standard |
 | 🔺 Low Poly (prozedurale Gebäude) | ✅ verfügbar |
-| 🏰 Mittelalter · 👾 Pixel-Art · 🌃 Cyberpunk · ⛩️ Japan | 🔜 demnächst |
+| 🌃 Cyberpunk (Neon, immer Nacht) | ✅ verfügbar |
+| 🏰 Mittelalter · 👾 Pixel-Art · ⛩️ Japan | 🔜 demnächst |
+
+<p align="center"><img src="docs/cyberpunk.jpg" alt="Das Cyberpunk-Thema"><br><sub>🌃 Das Cyberpunk-Thema: dieselbe Stadt, in Neon, bei Nacht.</sub></p>
 
 <p align="center"><img src="docs/lowpoly.jpg" width="70%" alt="Das Low-Poly-Thema"><br><sub>Das Low-Poly-Thema.</sub></p>
 
@@ -208,7 +211,8 @@ npm run build    # baut dist/bitropolis.html neu
 - [ ] Git-Historie: zusehen, wie die Stadt Commit für Commit entsteht
 - [ ] Ego-Perspektive zum „Spazierengehen“
 - [ ] Wetter je nach Projektzustand (TODOs, fehlschlagende Tests…)
-- [ ] Themen Mittelalter, Pixel-Art und Cyberpunk
+- [x] Cyberpunk-Thema
+- [ ] Themen Mittelalter und Pixel-Art
 
 ## 📄 Lizenz
 

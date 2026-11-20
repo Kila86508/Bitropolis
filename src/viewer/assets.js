@@ -43,14 +43,24 @@ function asKey(P, name) {
   if (!k) { k = obfName(name, P.salt); P.keys.set(name, k); }
   return k;
 }
-export function packModel(pack, name) { const P = asPacks[pack]; return (P && P.models[asKey(P, name)]) || null; }
+// Pack superposé (thème Cyberpunk) : pour le pack « city », un modèle présent dans le pack superposé
+// est pris là ; sinon (véhicules, sol, mobilier…) dans le pack de ville.
+let asOverlay = null;
+export function setPackOverlay(name) { asOverlay = name && asPacks[name] ? name : null; }
+export function overlayActive() { return !!asOverlay; }
+export function overlayHas(name) { const O = asOverlay && asPacks[asOverlay]; return !!(O && O.models[asKey(O, name)]); }
+function asPack(pack, name) {
+  if (pack === 'city' && asOverlay) { const O = asPacks[asOverlay]; if (O && O.models[asKey(O, name)]) return O; }
+  return asPacks[pack];
+}
+export function packModel(pack, name) { const P = asPack(pack, name); return (P && P.models[asKey(P, name)]) || null; }
 
 // Version simplifiée d'un modèle pour les objets lointains : les sommets sont regroupés sur une grille de
 // `cell` unités (un lot = 1 unité) — couleur et éclairage compris, donc chaque matériau garde ses couleurs —
 // et les triangles devenus plats ou en double disparaissent. Les gratte-ciel passent ainsi de ~27 000 à ~4 500
 // triangles. Renvoie null si le gain est trop faible pour valoir une seconde géométrie.
 export function packLodGeometry(pack, name, cell = 0.035) {
-  const P = asPacks[pack];
+  const P = asPack(pack, name);
   if (!P) return null;
   const key = name + '~' + cell;
   if (P.cache.has(key)) return P.cache.get(key);
@@ -108,7 +118,7 @@ export function asDecode16(buf, offset, n, stride, Ctor) {
 
 // Géométrie d'un modèle (mise en cache). `warp(x, y, z)` peut déformer les sommets (non mis en cache).
 export function packGeometry(pack, name, warp = null) {
-  const P = asPacks[pack];
+  const P = asPack(pack, name);
   const m = P && P.models[asKey(P, name)];
   if (!m) return null;
   if (!warp && P.cache.has(name)) return P.cache.get(name);

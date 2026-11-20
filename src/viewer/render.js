@@ -6,7 +6,7 @@ import { CityControls } from './controls.js';
 import { buildLandscape, hasLandscapeAssets } from './landscape.js';
 import { layoutGrid, CELL } from '../core/grid.js';
 import { VEHICLES, ROAD_KIT_HALF, ROAD_KIT_TOP, ROAD_KIT_TIERS, ROAD_KIT_DECK, ROAD_KIT_DECK_WOOD } from '../core/catalog.js';
-import { packReady, packModel } from './assets.js';
+import { packReady, packModel, setPackOverlay, overlayActive } from './assets.js';
 import { buildPackCity, buildPackVehicles, makePackMaterial, CITY_Y } from './citypack.js';
 import { TrafficSim } from './traffic.js';
 import { tp } from './i18n.js';
@@ -206,7 +206,9 @@ export class CityRenderer {
     const t0 = performance.now();
     const usePack = !!(this.theme.pack && packReady('city'));
     this.usePack = usePack;
-    const city = usePack ? layoutGrid(analysis, { kit: !!packModel('city', 'Route_Rampe') }) : layoutCity(analysis);
+    // thème à pack superposé (Cyberpunk) : modèles néon quand ils existent, familles L1–L8 seulement
+    setPackOverlay(usePack && this.theme.overlay && packReady(this.theme.overlay) ? this.theme.overlay : null);
+    const city = usePack ? layoutGrid(analysis, { kit: !!packModel('city', 'Route_Rampe'), onlyL: overlayActive() }) : layoutCity(analysis);
     this.city = city;
     const theme = this.theme;
     const files = analysis.files;
@@ -230,7 +232,7 @@ export class CityRenderer {
     this.buildings = new Array(files.length);
     if (usePack) {
       // --- Ville du pack : sol, routes N1→N8, bâtiments à stades, arbres, monuments
-      this._packMat = makePackMaterial(this.glow, this.timeU);
+      this._packMat = makePackMaterial(this.glow, this.timeU, { winTint: this.theme.winTint });
       const pc = buildPackCity(city, analysis, this._packMat, makeRng('pack:' + analysis.name));
       root.add(pc.group);
       this.buildings = pc.buildings;
@@ -391,6 +393,16 @@ export class CityRenderer {
     this.controls.autoRotate = true;
     const fogNear = Math.max(outer * 2.2, this.landHalf * 1.5);
     this.scene.fog = new THREE.Fog(theme.sky.fogDay, fogNear, fogNear + T * (this.landHalf ? 1.6 : 0.55));
+    // thème toujours nocturne (Cyberpunk) : nuit tout de suite, sans cycle ; retour au cycle en quittant ce thème
+    if (theme.night) {
+      this.dayCycle.on = false; this._themeNight = true;
+      this.night = true; this.nightMix = 1;
+      if (this.onNightChange) this.onNightChange(true);
+    } else if (this._themeNight) {
+      this._themeNight = false; this.dayCycle.on = true; this.dayCycle.clock = 0;
+      this.night = false; this.nightMix = 0;
+      if (this.onNightChange) this.onNightChange(false);
+    }
     this._applyNight(true);
     this.buildMs = Math.round(performance.now() - t0);
     return city;
@@ -765,10 +777,14 @@ export class CityRenderer {
     const sky = new THREE.Color(th.sky.day).lerp(new THREE.Color(th.sky.night), k);
     this.scene.background = sky;
     if (this.scene.fog) this.scene.fog.color.copy(new THREE.Color(th.sky.fogDay).lerp(new THREE.Color(th.sky.fogNight), k));
-    this.sun.intensity = 2.4 * (1 - k) + 0.35 * k;
-    this.sun.color.set('#fff1d6').lerp(new THREE.Color('#9db4ff'), k);
-    this.hemi.intensity = 1.0 * (1 - k) + 0.28 * k;
-    this.ambient.intensity = 0.25 * (1 - k) + 0.12 * k;
+    // éclairage de nuit : celui du thème s'il en définit un (Cyberpunk : ambiance violette plus lumineuse)
+    const NL = th.nightLight || {};
+    this.sun.intensity = 2.4 * (1 - k) + (NL.sun ?? 0.35) * k;
+    this.sun.color.set('#fff1d6').lerp(new THREE.Color(NL.sunColor || '#9db4ff'), k);
+    this.hemi.intensity = 1.0 * (1 - k) + (NL.hemi ?? 0.28) * k;
+    this.hemi.color.set('#e6f4ff').lerp(new THREE.Color(NL.hemiSky || '#e6f4ff'), k);
+    this.hemi.groundColor.set('#6f8f5a').lerp(new THREE.Color(NL.hemiGround || '#6f8f5a'), k);
+    this.ambient.intensity = 0.25 * (1 - k) + (NL.ambient ?? 0.12) * k;
     this.glow.value = k * 1.0;
     this.renderer.toneMappingExposure = 1.05 - k * 0.1;
   }

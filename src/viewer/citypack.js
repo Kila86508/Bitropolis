@@ -2,7 +2,7 @@
 // Sol, routes (8 niveaux), bâtiments à stades N1→N8, arbres et monuments : un InstancedMesh par modèle.
 import { CELL } from '../core/grid.js';
 import { TREES, GROUNDS, VARIANTS, chainOf, footprint, familyOf, kitRoad } from '../core/catalog.js';
-import { packGeometry, packModel, packLodGeometry } from './assets.js';
+import { packGeometry, packModel, packLodGeometry, overlayActive, overlayHas } from './assets.js';
 import { hashString } from '../core/rules.js';
 
 // Harmonies de couleurs pour les matériaux recolorables du pack (murs 1–3, toit, boiseries, accent).
@@ -31,7 +31,9 @@ const GROUND_Y = CITY_Y - 0.012 * CELL; // dalles de sol, légèrement sous les 
 //  - lampadaires et signaux lumineux (aLit = 2) toujours allumés ;
 //  - lentilles des feux tricolores (aLit 3–5 : têtes « X », 6–8 : têtes « Y » ; rouge, vert, orange),
 //    commandées par l'attribut d'instance aSig = (état X, état Y) : 0 rouge, 1 orange, 2 vert.
-export function makePackMaterial(uGlow, uTime) {
+//  - néons (aLit = 10) : brillent dans leur propre couleur, de jour un peu, de nuit beaucoup.
+// opts.winTint : part de la couleur du matériau dans la lueur des fenêtres (0,15 : orangé chaud ; Cyberpunk : couleurs vives)
+export function makePackMaterial(uGlow, uTime, opts = {}) {
   // double face : permet d'inverser certains bâtiments en miroir (l'éclairage « flat » reste juste)
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.78, metalness: 0.02, side: THREE.DoubleSide });
   const schemes = PACK_SCHEMES.flat().map((hex) => new THREE.Color(hex));
@@ -39,7 +41,8 @@ export function makePackMaterial(uGlow, uTime) {
     sh.uniforms.uGlow = uGlow;
     sh.uniforms.uTime = uTime;
     sh.uniforms.uScheme = { value: schemes };
-    sh.vertexShader = `attribute float aLit;\nattribute float aRole;\nattribute float aSeed;\nattribute vec2 aSig;\nuniform float uTime;\nuniform vec3 uScheme[${schemes.length}];\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\n` +
+    sh.uniforms.uWinTint = { value: opts.winTint ?? 0.15 };
+    sh.vertexShader = `attribute float aLit;\nattribute float aRole;\nattribute float aSeed;\nattribute vec2 aSig;\nuniform float uTime;\nuniform vec3 uScheme[${schemes.length}];\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\nvarying float vNeon;\n` +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       // identité stable de l'instance (sa graine), même quand le niveau de détail renumérote les instances
       #ifdef USE_INSTANCING
@@ -49,7 +52,7 @@ export function makePackMaterial(uGlow, uTime) {
       #endif
       float bxRnd = fract(sin(bxId * 12.9898 + 78.233) * 43758.5453);
       vLit = 0.0; vLamp = 0.0; vOn = 0.0; vLampCol = vec3(0.0);
-      vWin = 0.0; vFy = position.y; vRnd = bxRnd; vIdS = bxId;
+      vWin = 0.0; vFy = position.y; vRnd = bxRnd; vIdS = bxId; vNeon = 0.0;
       vRecol = vec3(0.0); vRecolOn = 0.0;
       #ifdef USE_INSTANCING
       if (aRole > 0.5) {
@@ -57,7 +60,9 @@ export function makePackMaterial(uGlow, uTime) {
         if (si > 0.5) { vRecol = uScheme[int(si - 1.0) * 6 + int(aRole + 0.5) - 1]; vRecolOn = 1.0; }
       }
       #endif
-      if (aLit > 8.5) {
+      if (aLit > 9.5) {
+        vNeon = 1.0; // néon
+      } else if (aLit > 8.5) {
         vWin = 2.0; // façade vitrée : étages calculés par pixel (voir le fragment), plus doux qu'une fenêtre
       } else if (aLit > 2.5) {
         float axisY = aLit > 5.5 ? 1.0 : 0.0;
@@ -72,7 +77,7 @@ export function makePackMaterial(uGlow, uTime) {
       } else if (aLit > 0.5) {
         vWin = 1.0; // fenêtre : étages calculés par pixel (un grand panneau vitré couvre plusieurs étages)
       }`);
-    sh.fragmentShader = 'uniform float uGlow;\nuniform float uTime;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\n' + sh.fragmentShader
+    sh.fragmentShader = 'uniform float uGlow;\nuniform float uTime;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\nvarying float vNeon;\nuniform float uWinTint;\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         diffuseColor.rgb = mix(diffuseColor.rgb, vRecol, vRecolOn);
         if (vLamp > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb * 0.22, vLampCol * 0.55, vOn);`)
@@ -89,10 +94,11 @@ export function makePackMaterial(uGlow, uTime) {
           float hh = fract(sin(fl * 91.7 + sd * 12.9898 + cyc * 37.719) * 43758.5453);
           litF = glass > 0.5 ? (hh > 0.62 ? 0.16 : 0.0) : (hh > 0.42 ? 0.4 : 0.0);
         }
-        totalEmissiveRadiance += mix(vec3(1.0, 0.68, 0.32), vColor.rgb, 0.15) * uGlow * litF;
+        totalEmissiveRadiance += mix(vec3(1.0, 0.68, 0.32), vColor.rgb, uWinTint) * uGlow * litF;
+        totalEmissiveRadiance += vColor.rgb * vNeon * (0.35 + 1.5 * uGlow);
         if (vLamp > 0.5) totalEmissiveRadiance += vLampCol * vOn * (0.7 + 1.6 * uGlow);`);
   };
-  mat.customProgramCacheKey = () => 'bitropolis-pack-5';
+  mat.customProgramCacheKey = () => 'bitropolis-pack-6';
   return mat;
 }
 
@@ -265,12 +271,13 @@ function packCandidates(f, lot) {
     if (!m || m.startsWith('@')) return;
     const [w, d] = footprint(m);
     if (w !== fw || d !== fd) return;
+    if (overlayActive() && !overlayHas(m)) return;
     const info = packModel('city', m);
     if (!info) return;
     for (const k of [m, ...(info.alts || [])]) if (!out.has(k) || out.get(k).cost > cost) out.set(k, { base: m, cost });
   };
   add(lot.model, 0);
-  const own = chainOf(f), i = own.indexOf(lot.model), n = own.length;
+  const own = chainOf(f, overlayActive() ? (c) => c.every((m) => /_L\d$/.test(m)) : null), i = own.indexOf(lot.model), n = own.length;
   if (i >= 0 && !/^Townhall|^TownHall/.test(lot.model)) {
     for (const [, chain] of VARIANTS[f.kind] || []) {
       const j = Math.round((i * (chain.length - 1)) / Math.max(1, n - 1));
@@ -391,7 +398,11 @@ export function buildPackCity(city, analysis, material, rng) {
   } else {
     for (const t of city.trees) I.add(TREES[t.kind % TREES.length], t.x, CITY_Y, t.z, t.s * 9, CELL * t.s * 1.2);
   }
-  const monuments = city.roundabouts.map((m) => {
+  // thème Cyberpunk : les monuments du pack (blancs) cèdent la place aux mémoriaux et fontaines néon
+  const NEON_MON = ['Memorial_L6', 'Fountain_L6', 'Memorial_L8', 'Fountain_L8', 'Memorial_L4'];
+  const monuments = city.roundabouts.map((m0, mi) => {
+    const neon = overlayActive() && NEON_MON.find((n, k) => k >= mi % NEON_MON.length && overlayHas(n));
+    const m = neon ? { ...m0, model: neon } : m0;
     I.add(m.model, m.x, CITY_Y, m.z, Math.PI);
     const mon = { ...m, box: packBox(m.model, m.x, m.z, Math.PI, CELL) };
     mon.matrix = new THREE.Matrix4().compose(new THREE.Vector3(m.x, CITY_Y, m.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI), new THREE.Vector3(CELL, CELL, CELL));

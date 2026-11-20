@@ -193,7 +193,9 @@ function gdFoldSmallDirs(root, min) {
 export function layoutGrid(analysis, opts = {}) {
   const files = analysis.files;
   const rng = makeRng('grid:' + analysis.name + ':' + files.length);
-  const growth = files.map((f) => growthOf(f));
+  // opts.onlyL : seulement les familles L1–L8 (thème Cyberpunk, qui n'a pas les anciens modèles du pack)
+  const keepL = opts.onlyL ? (chain) => chain.every((m) => /_L\d$/.test(m)) : null;
+  const growth = files.map((f) => growthOf(f, undefined, keepL));
   const root = buildTree(files);
   gdFoldSmallDirs(root, Math.floor(files.length / 400));
   const topIndex = new Map();
