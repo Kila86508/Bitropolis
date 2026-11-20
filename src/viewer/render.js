@@ -385,7 +385,7 @@ export class CityRenderer {
     const shadowRes = S > 60 ? 4096 : 2048;
     this.sun.shadow.mapSize.set(shadowRes, shadowRes);
     if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
-    this.sun.position.set(S * 0.8, S * 1.6, S * 0.55);
+    this.sunS = S; // la position du soleil suit l'heure (voir _applyNight)
     this.controls.bounds = Math.max(outer + 40, this.landHalf);
     this.controls.maxRadius = Math.max(260, outer * 4.5, this.landHalf * 3.2);
     this.home = { radius: Math.max(50, outer * 2.3), phi: 0.92 };
@@ -886,15 +886,22 @@ export class CityRenderer {
     if (!force && Math.abs(this.nightMix - target) < 0.001) return;
     const k = this.nightMix;
     const th = this.theme;
-    const sky = new THREE.Color(th.sky.day).lerp(new THREE.Color(th.sky.night), k);
+    // crépuscule et aube (dusk : 0 en plein jour et en pleine nuit, 1 au milieu du fondu) : le ciel rosit, le soleil
+    // descend vers l'horizon en virant à l'orangé — les ombres s'allongent — puis la lune se lève d'un autre côté
+    const dusk = Math.sin(Math.PI * k), warm = new THREE.Color(th.sky.dusk || '#f2a57c');
+    const sky = new THREE.Color(th.sky.day).lerp(new THREE.Color(th.sky.night), k).lerp(warm, 0.45 * dusk);
     this.scene.background = sky;
-    if (this.scene.fog) this.scene.fog.color.copy(new THREE.Color(th.sky.fogDay).lerp(new THREE.Color(th.sky.fogNight), k));
+    if (this.scene.fog) this.scene.fog.color.copy(new THREE.Color(th.sky.fogDay).lerp(new THREE.Color(th.sky.fogNight), k).lerp(warm, 0.4 * dusk));
+    if (this.sunS) {
+      const el = (58.7 - 40 * dusk) * Math.PI / 180, az = (34.5 + 60 * k) * Math.PI / 180, R = this.sunS * 1.87;
+      this.sun.position.set(R * Math.cos(el) * Math.cos(az), R * Math.sin(el), R * Math.cos(el) * Math.sin(az));
+    }
     // éclairage de nuit : celui du thème s'il en définit un (Cyberpunk : ambiance violette plus lumineuse)
     const NL = th.nightLight || {};
     this.sun.intensity = 2.4 * (1 - k) + (NL.sun ?? 0.35) * k;
-    this.sun.color.set('#fff1d6').lerp(new THREE.Color(NL.sunColor || '#9db4ff'), k);
+    this.sun.color.set('#fff1d6').lerp(new THREE.Color(NL.sunColor || '#9db4ff'), k).lerp(new THREE.Color('#ff9a52'), 0.75 * dusk);
     this.hemi.intensity = 1.0 * (1 - k) + (NL.hemi ?? 0.28) * k;
-    this.hemi.color.set('#e6f4ff').lerp(new THREE.Color(NL.hemiSky || '#e6f4ff'), k);
+    this.hemi.color.set('#e6f4ff').lerp(new THREE.Color(NL.hemiSky || '#e6f4ff'), k).lerp(warm, 0.3 * dusk);
     this.hemi.groundColor.set('#6f8f5a').lerp(new THREE.Color(NL.hemiGround || '#6f8f5a'), k);
     this.ambient.intensity = 0.25 * (1 - k) + (NL.ambient ?? 0.12) * k;
     this.glow.value = k * 1.0;

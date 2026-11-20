@@ -189,12 +189,13 @@ export function readGLB(file) {
 }
 
 // Éclairage d'un matériau .obj : lentilles de feux (3–8, d'après l'axe de leur tête), lampes (2), fenêtres (1),
-// façades vitrées (9), néons qui brillent dans leur propre couleur (10).
+// façades vitrées (9), néons qui brillent dans leur propre couleur (10), eau qui ondule (11).
 const OBJ_LENS = /(^|_)fl_(red|green|yel)$/i;
 function objLit(key) {
   const lens = /(?:^|_)fl_(red|green|yel)\|([XY])$/i.exec(key);
   if (lens) return (lens[2] === 'X' ? 3 : 6) + { red: 0, green: 1, yel: 2 }[lens[1].toLowerCase()];
   if (/neon/i.test(key)) return 10;
+  if (/(^|_)water$/i.test(key)) return 11;
   if (/light|lamp|bulb/i.test(key) && !/pole|post|base/i.test(key)) return 2;
   if (/(^|_)win$/i.test(key)) return 1;
   if (/glass/i.test(key)) return 9; // façade vitrée : éclairage de nuit plus doux

@@ -25,13 +25,17 @@ const PACK_SCHEME_COUNT = PACK_SCHEMES.length + 1;
 export const CITY_Y = 0.05;          // la ville affleure juste au-dessus de la pelouse de la campagne
 const GROUND_Y = CITY_Y - 0.012 * CELL; // dalles de sol, légèrement sous les routes et les bâtiments
 
-// Matériau des modèles du pack : couleurs par sommet, et la nuit :
-//  - fenêtres (aLit = 1) allumées étage par étage, qui s'allument et s'éteignent chacune à son rythme ;
+// Matériau des modèles du pack : couleurs par sommet, et :
+//  - fenêtres (aLit = 1) : la nuit, allumées étage par étage ; chaque étage s'allume et s'éteint en fondu, à son
+//    rythme, sa lumière respire un peu, et quelques étages ont la lueur bleutée et sautillante d'une télévision ;
+//    de jour, le verre renvoie un éclat de soleil ;
 //  - façades vitrées (aLit = 9) : même principe, plus doux et plus clairsemé ;
 //  - lampadaires et signaux lumineux (aLit = 2) toujours allumés ;
 //  - lentilles des feux tricolores (aLit 3–5 : têtes « X », 6–8 : têtes « Y » ; rouge, vert, orange),
 //    commandées par l'attribut d'instance aSig = (état X, état Y) : 0 rouge, 1 orange, 2 vert.
-//  - néons (aLit = 10) : brillent dans leur propre couleur, de jour un peu, de nuit beaucoup.
+//  - néons (aLit = 10) : brillent dans leur propre couleur, de jour un peu, de nuit beaucoup ;
+//  - eau (aLit = 11) : ondulations qui se déplacent, reflets clairs, soleil qui scintille à la surface ;
+//  - partout : le bas des murs est légèrement assombri, pour que les bâtiments « posent » au sol.
 // opts.winTint : part de la couleur du matériau dans la lueur des fenêtres (0,15 : orangé chaud ; Cyberpunk : couleurs vives)
 export function makePackMaterial(uGlow, uTime, opts = {}) {
   // double face : permet d'inverser certains bâtiments en miroir (l'éclairage « flat » reste juste)
@@ -42,7 +46,8 @@ export function makePackMaterial(uGlow, uTime, opts = {}) {
     sh.uniforms.uTime = uTime;
     sh.uniforms.uScheme = { value: schemes };
     sh.uniforms.uWinTint = { value: opts.winTint ?? 0.15 };
-    sh.vertexShader = `attribute float aLit;\nattribute float aRole;\nattribute float aSeed;\nattribute vec2 aSig;\nuniform float uTime;\nuniform vec3 uScheme[${schemes.length}];\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\nvarying float vNeon;\n` +
+    const varyings = 'varying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\nvarying float vNeon;\nvarying float vWater;\nvarying vec3 vWp;\n';
+    sh.vertexShader = `attribute float aLit;\nattribute float aRole;\nattribute float aSeed;\nattribute vec2 aSig;\nuniform float uTime;\nuniform vec3 uScheme[${schemes.length}];\n${varyings}` +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       // identité stable de l'instance (sa graine), même quand le niveau de détail renumérote les instances
       #ifdef USE_INSTANCING
@@ -52,15 +57,23 @@ export function makePackMaterial(uGlow, uTime, opts = {}) {
       #endif
       float bxRnd = fract(sin(bxId * 12.9898 + 78.233) * 43758.5453);
       vLit = 0.0; vLamp = 0.0; vOn = 0.0; vLampCol = vec3(0.0);
-      vWin = 0.0; vFy = position.y; vRnd = bxRnd; vIdS = bxId; vNeon = 0.0;
+      vWin = 0.0; vFy = position.y; vRnd = bxRnd; vIdS = bxId; vNeon = 0.0; vWater = 0.0;
       vRecol = vec3(0.0); vRecolOn = 0.0;
+      // position dans le monde (ondulations de l'eau)
+      vec4 bxW = vec4(transformed, 1.0);
+      #ifdef USE_INSTANCING
+        bxW = instanceMatrix * bxW;
+      #endif
+      vWp = (modelMatrix * bxW).xyz;
       #ifdef USE_INSTANCING
       if (aRole > 0.5) {
         float si = floor(fract(aSeed) * ${PACK_SCHEME_COUNT}.0);
         if (si > 0.5) { vRecol = uScheme[int(si - 1.0) * 6 + int(aRole + 0.5) - 1]; vRecolOn = 1.0; }
       }
       #endif
-      if (aLit > 9.5) {
+      if (aLit > 10.5) {
+        vWater = 1.0; // eau
+      } else if (aLit > 9.5) {
         vNeon = 1.0; // néon
       } else if (aLit > 8.5) {
         vWin = 2.0; // façade vitrée : étages calculés par pixel (voir le fragment), plus doux qu'une fenêtre
@@ -77,28 +90,58 @@ export function makePackMaterial(uGlow, uTime, opts = {}) {
       } else if (aLit > 0.5) {
         vWin = 1.0; // fenêtre : étages calculés par pixel (un grand panneau vitré couvre plusieurs étages)
       }`);
-    sh.fragmentShader = 'uniform float uGlow;\nuniform float uTime;\nvarying float vLit;\nvarying float vLamp;\nvarying float vOn;\nvarying vec3 vLampCol;\nvarying vec3 vRecol;\nvarying float vRecolOn;\nvarying float vWin;\nvarying float vFy;\nvarying float vRnd;\nvarying float vIdS;\nvarying float vNeon;\nuniform float uWinTint;\n' + sh.fragmentShader
+    sh.fragmentShader = `uniform float uGlow;\nuniform float uTime;\nuniform float uWinTint;\n${varyings}` + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         diffuseColor.rgb = mix(diffuseColor.rgb, vRecol, vRecolOn);
         if (vLamp > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb * 0.22, vLampCol * 0.55, vOn);`)
+      // (les normales sont déjà calculées ici, et l'éclairage vient juste après : on peut encore jouer sur la
+      // couleur, la rugosité et la normale de la face)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        vec3 bxN = inverseTransformDirection(normal, viewMatrix); // normale de la face dans le repère du monde
+        // le bas des murs un peu plus sombre : les bâtiments « posent » au sol
+        diffuseColor.rgb *= 1.0 - 0.16 * (1.0 - smoothstep(0.35, 0.75, abs(bxN.y))) * (1.0 - smoothstep(0.015, 0.2, vFy));
+
+        // eau : des ondes qui se croisent et se déplacent ; crêtes plus claires, creux plus sombres
+        if (vWater > 0.5) {
+          vec2 wp = vWp.xz;
+          float a1 = wp.x * 5.1 + wp.y * 2.3 + uTime * 1.25, a2 = wp.x * -2.7 + wp.y * 6.3 - uTime * 1.6, a3 = (wp.x + wp.y) * 9.7 + uTime * 2.3;
+          float w = sin(a1) * 0.5 + sin(a2) * 0.35 + sin(a3) * 0.15;
+          diffuseColor.rgb *= 0.94 + 0.1 * w;
+          diffuseColor.rgb += vec3(0.1, 0.13, 0.14) * smoothstep(0.55, 0.95, w);
+          roughnessFactor = 0.16;
+          if (bxN.y > 0.5) { // surface : la normale suit la pente des ondes, le reflet du soleil scintille
+            vec2 slope = vec2(cos(a1) * 5.1 * 0.5 + cos(a2) * -2.7 * 0.35, cos(a1) * 2.3 * 0.5 + cos(a2) * 6.3 * 0.35) * 0.035;
+            normal = normalize((viewMatrix * vec4(normalize(vec3(-slope.x, 1.0, -slope.y)), 0.0)).xyz);
+          }
+        }
+
         // fenêtres : un étage = une bande de hauteur, chaque étage s'allume et s'éteint à son propre rythme
         float litF = vLit;
+        vec3 bxWinCol = mix(vec3(1.0, 0.68, 0.32), vColor.rgb, uWinTint);
         if (vWin > 0.5) {
           // graine arrondie à un entier : le hachage ne dépend plus des infimes écarts d'interpolation entre pixels
           float sd = floor(vRnd * 997.0 + 0.5), sr = sd / 997.0;
           float glass = step(1.5, vWin);
           float fl = floor(vFy * 9.0);
           float period = mix(9.0 + 26.0 * fract(sr * 7.31 + fl * 0.173), 12.0 + 30.0 * fract(sr * 5.17 + fl * 0.231), glass);
-          float cyc = floor(uTime / period + sr * 31.0 + fl * 0.37);
+          float ph = uTime / period + sr * 31.0 + fl * 0.37, cyc = floor(ph), thr = mix(0.42, 0.62, glass);
           float hh = fract(sin(fl * 91.7 + sd * 12.9898 + cyc * 37.719) * 43758.5453);
-          litF = glass > 0.5 ? (hh > 0.62 ? 0.16 : 0.0) : (hh > 0.42 ? 0.4 : 0.0);
+          float hp = fract(sin(fl * 91.7 + sd * 12.9898 + (cyc - 1.0) * 37.719) * 43758.5453);
+          // l'étage bascule en fondu (une seconde et demie) plutôt que d'un coup
+          float on = mix(step(thr, hp), step(thr, hh), smoothstep(0.0, 1.5 / period, fract(ph)));
+          // la lumière respire un peu ; un étage sur six a la lueur bleutée et sautillante d'une télévision
+          float breathe = 0.9 + 0.1 * sin(uTime * (0.6 + 1.7 * fract(sr * 3.7 + fl * 0.61)) + fl * 2.1 + sd);
+          float tv = (1.0 - glass) * step(0.84, fract(sr * 11.3 + fl * 0.417));
+          float jump = 0.7 + 0.3 * fract(sin(floor(uTime * 4.0 + fl * 0.7) * 12.9898 + sd + fl) * 43758.5453);
+          litF = mix(0.4, 0.16, glass) * on * breathe * mix(1.0, jump, tv);
+          bxWinCol = mix(bxWinCol, vec3(0.55, 0.75, 1.0), tv * 0.65);
+          roughnessFactor = mix(0.22, roughnessFactor, uGlow); // de jour, le verre renvoie un éclat de soleil
         }
-        totalEmissiveRadiance += mix(vec3(1.0, 0.68, 0.32), vColor.rgb, uWinTint) * uGlow * litF;
+        totalEmissiveRadiance += bxWinCol * uGlow * litF;
         totalEmissiveRadiance += vColor.rgb * vNeon * (0.35 + 1.5 * uGlow);
         if (vLamp > 0.5) totalEmissiveRadiance += vLampCol * vOn * (0.7 + 1.6 * uGlow);`);
   };
-  mat.customProgramCacheKey = () => 'bitropolis-pack-6';
+  mat.customProgramCacheKey = () => 'bitropolis-pack-7';
   return mat;
 }
 
