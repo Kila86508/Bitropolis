@@ -395,6 +395,11 @@ export class CityRenderer {
     this.controls.autoRotate = true;
     const fogNear = Math.max(outer * 2.2, this.landHalf * 1.5);
     this.scene.fog = new THREE.Fog(theme.sky.fogDay, fogNear, fogNear + T * (this.landHalf ? 1.6 : 0.55));
+    // Hauteur sous laquelle se trouve tout ce qui est affiché (bâtiments à leur taille finale, nuages, relief) :
+    // au-dessus, la caméra peut éloigner son plan proche sans rien couper (voir _fitDepth).
+    let top = new THREE.Box3().setFromObject(root).max.y;
+    for (const b of this.buildings) if (b && b.box) top = Math.max(top, b.box.max.y);
+    this.skyTop = (Number.isFinite(top) ? top : 80) + 6;
     // thème toujours nocturne (Cyberpunk) : nuit tout de suite, sans cycle ; retour au cycle en quittant ce thème
     if (theme.night) {
       this.dayCycle.on = false; this._themeNight = true;
@@ -970,10 +975,22 @@ export class CityRenderer {
 
   screenshot() { if (this.lod) this.lod.update(this.camera); this.renderer.render(this.scene, this.camera); return this.canvas.toDataURL('image/png'); }
 
+  // Précision de profondeur. Avec un plan proche fixe à 0,5, deux surfaces à quelques centimètres l'une de l'autre
+  // (une fenêtre sur son mur, un marquage sur la chaussée) scintillent dès qu'on dézoome. Le plan proche s'éloigne donc :
+  //  - franchement quand la caméra est au-dessus de tout ce qui est affiché (rien ne peut alors être coupé) ;
+  //  - à peine sinon (0,5 % de la distance de vue), pour les vues rasantes.
+  _fitDepth() {
+    const cam = this.camera;
+    const clear = this.skyTop === undefined ? 0 : cam.position.y - this.skyTop;
+    const near = Math.max(0.5, this.controls.radius * 0.005, Math.min(clear * 0.6, 400));
+    if (Math.abs(near - cam.near) > cam.near * 0.02) { cam.near = near; cam.updateProjectionMatrix(); }
+  }
+
   _loop() {
     requestAnimationFrame(this._loop);
     const dt = Math.min(0.05, this.clock.getDelta());
     this.controls.update(dt);
+    this._fitDepth();
     if (this.city) {
       const cyc = this.dayCycle;
       if (cyc.on) {
