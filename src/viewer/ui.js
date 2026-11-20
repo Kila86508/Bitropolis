@@ -231,7 +231,7 @@ export class CityUI {
       fx.weather = e.setWeather(fx.weather);
       e.setClouds(fx.clouds);
       for (const b of fxMenu.querySelectorAll('[data-fx]')) b.classList.toggle('on', b.dataset.fx === 'clouds' ? !!fx.clouds : fx[b.dataset.fx] === b.dataset.v);
-      $('#btn-fx').classList.toggle('on', fx.quality === 'high' || fx.weather !== 'clear');
+      $('#btn-fx').classList.toggle('on', fx.quality !== 'std' || fx.weather !== 'clear');
       if (save) try { localStorage.setItem('bitropolis.fx', JSON.stringify(fx)); } catch {}
     };
     fxApply(false);

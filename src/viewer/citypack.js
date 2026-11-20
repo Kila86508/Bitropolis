@@ -38,7 +38,8 @@ const GROUND_Y = CITY_Y - 0.012 * CELL; // dalles de sol, légèrement sous les 
 //  - partout : le bas des murs est légèrement assombri, pour que les bâtiments « posent » au sol ;
 //  - pluie (uWet : sol mouillé, uRain : pluie en cours) : les surfaces foncent, le sol et les toits brillent,
 //    de petites éclaboussures sautillent, l'eau s'agite ;
-//  - beaux shaders (uFancy) : l'eau reflète le ciel (uSky), les murs sont un peu plus ancrés au sol.
+//  - beaux shaders (uFancy ≥ 1) : l'eau reflète le ciel (uSky), les murs sont un peu plus ancrés au sol ;
+//    shaders « Fou » (uFancy = 2) : de jour, les vitres reflètent aussi le ciel.
 // opts.wet, opts.rain, opts.fancy, opts.sky : uniformes partagés avec le moteur de rendu.
 // opts.winTint : part de la couleur du matériau dans la lueur des fenêtres (0,15 : orangé chaud ; Cyberpunk : couleurs vives)
 export function makePackMaterial(uGlow, uTime, opts = {}) {
@@ -160,12 +161,16 @@ export function makePackMaterial(uGlow, uTime, opts = {}) {
           litF = mix(0.4, 0.16, glass) * on * breathe * mix(1.0, jump, tv);
           bxWinCol = mix(bxWinCol, vec3(0.55, 0.75, 1.0), tv * 0.65);
           roughnessFactor = mix(0.22, roughnessFactor, uGlow); // de jour, le verre renvoie un éclat de soleil
+          if (uFancy > 1.5) { // shaders « Fou » : de jour, les vitres reflètent le ciel quand on les regarde de biais
+            float fr = pow(1.0 - max(dot(normalize(vViewPosition), normal), 0.0), 2.5);
+            diffuseColor.rgb = mix(diffuseColor.rgb, uSky, 0.55 * fr * (1.0 - uGlow));
+          }
         }
         totalEmissiveRadiance += bxWinCol * uGlow * litF;
         totalEmissiveRadiance += vColor.rgb * vNeon * (0.35 + 1.5 * uGlow);
         if (vLamp > 0.5) totalEmissiveRadiance += vLampCol * vOn * (0.7 + 1.6 * uGlow);`);
   };
-  mat.customProgramCacheKey = () => 'bitropolis-pack-8';
+  mat.customProgramCacheKey = () => 'bitropolis-pack-9';
   return mat;
 }
 

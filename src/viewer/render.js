@@ -9,6 +9,7 @@ import { VEHICLES, ROAD_KIT_HALF, ROAD_KIT_TOP, ROAD_KIT_TIERS, ROAD_KIT_DECK, R
 import { packReady, packModel, setPackOverlay, overlayActive } from './assets.js';
 import { buildPackCity, buildPackVehicles, makePackMaterial, CITY_Y } from './citypack.js';
 import { FxPost } from './post.js';
+import { FxSky } from './sky.js';
 import { FxWeather } from './weather.js';
 import { TrafficSim } from './traffic.js';
 import { tp } from './i18n.js';
@@ -138,10 +139,10 @@ export class CityRenderer {
     this.glow = { value: 0 };
     this.timeU = { value: 0 }; // horloge des lumières (fenêtres qui s'allument / s'éteignent)
     // effets réglables depuis le HUD : qualité des shaders ('std' | 'high'), météo ('clear' | 'rain' | 'storm'), nuages
-    this.fx = { quality: 'std', weather: 'clear', clouds: true };
+    this.fx = { quality: 'std', weather: 'clear', clouds: true }; // qualité : 'std' | 'high' (beaux) | 'ultra' (fou)
     this.wetU = { value: 0 };   // sol mouillé (0 … 1) : monte vite quand il pleut, redescend lentement
     this.rainU = { value: 0 };  // pluie en cours (0 … 1)
-    this.fancyU = { value: 0 }; // 1 : beaux shaders
+    this.fancyU = { value: 0 }; // 1 : beaux shaders, 2 : shaders « Fou »
     this.skyU = { value: new THREE.Color('#bfe3f7') }; // couleur du ciel (reflets de l'eau)
     this.post = null;
     this.night = false;
@@ -162,6 +163,7 @@ export class CityRenderer {
     this.ambient = new THREE.AmbientLight('#ffffff', 0.25);
     this.scene.add(this.hemi, this.sun, this.sun.target, this.ambient);
     this.weather = new FxWeather(this.scene);
+    this.sky = new FxSky(this.scene); // ciel calculé, affiché avec les shaders « Fou »
 
     this.city = null;
     this.root = null;
@@ -894,21 +896,35 @@ export class CityRenderer {
   // --- Effets (HUD)
   // qualité des shaders : 'high' ajoute un halo lumineux et des reflets ; renvoie la qualité réellement retenue
   setQuality(q) {
-    if (q === 'high') {
+    if (q === 'high' || q === 'ultra') {
       if (!this.post) this.post = new FxPost(this.renderer);
       if (!this.post.ok) q = 'std'; // carte graphique sans image à virgule flottante
     } else q = 'std';
     this.fx.quality = q;
-    this.fancyU.value = q === 'high' ? 1 : 0;
-    if (q !== 'high' && this.post) this.post.dispose();
+    this.fancyU.value = q === 'ultra' ? 2 : q === 'high' ? 1 : 0;
+    if (this.post) { this.post.ultra = q === 'ultra'; if (q === 'std') this.post.dispose(); }
+    this.sky.mesh.visible = q === 'ultra';
+    if (this.city) this._applyNight(true);
     return q;
   }
   setWeather(kind) { this.weather.set(kind); this.fx.weather = this.weather.kind; return this.fx.weather; }
   setClouds(on) { this.fx.clouds = !!on; if (this.clouds) this.clouds.visible = this.fx.clouds; }
   // dessine l'image : rendu simple, ou rendu avec halo quand les beaux shaders sont choisis
   _draw() {
-    if (this.fx.quality === 'high' && this.post && this.post.ok) this.post.render(this.scene, this.camera, this.glow.value);
-    else { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); }
+    if (this.fx.quality !== 'std' && this.post && this.post.ok) {
+      this.post.render(this.scene, this.camera, this.glow.value, this.fx.quality === 'ultra' ? this._sunOnScreen() : null, this.timeU.value);
+    } else { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); }
+  }
+  // position du soleil (ou de la lune) à l'écran, de 0 à 1, et force des rayons de lumière qui en partent
+  _sunOnScreen() {
+    const cam = this.camera, dir = new THREE.Vector3().copy(this.sun.position).normalize();
+    const p = dir.clone().multiplyScalar(1000).add(cam.position).project(cam);
+    const front = dir.dot(cam.getWorldDirection(new THREE.Vector3())) > 0 ? 1 : 0;
+    // Soleil hors de l'image (le plus souvent au-dessus) : on garde sa direction, ramenée près du bord, pour que les
+    // rayons continuent d'en descendre. Ils faiblissent alors, ainsi que sous la pluie et la nuit (lune).
+    const edge = Math.max(Math.abs(p.x), Math.abs(p.y)), k = edge > 1.5 ? 1.5 / edge : 1;
+    const amount = front * Math.max(0.3, Math.min(1, (2.2 - edge) / 1.0)) * (1 - 0.75 * this.weather.amount) * (0.85 - 0.6 * this.nightMix);
+    return { x: p.x * k * 0.5 + 0.5, y: p.y * k * 0.5 + 0.5, amount };
   }
   setLabels(on) { this.state.labels = on; if (this.labels) this.labels.visible = on; }
   setDeps(on) { this.state.deps = on; if (on) this._buildDeps(); if (this.depGroup) this.depGroup.visible = on; }
@@ -934,7 +950,7 @@ export class CityRenderer {
       if (this.fogBase) { this.scene.fog.near = this.fogBase[0] * (1 - 0.55 * w); this.scene.fog.far = this.fogBase[1] * (1 - 0.4 * w); }
     }
     if (this.sunS) {
-      const el = (58.7 - 40 * low) * Math.PI / 180, az = (34.5 + 60 * k) * Math.PI / 180, R = this.sunS * 1.87;
+      const el = (58.7 - 50 * low) * Math.PI / 180, az = (34.5 + 60 * k) * Math.PI / 180, R = this.sunS * 1.87;
       this.sun.position.set(R * Math.cos(el) * Math.cos(az), R * Math.sin(el), R * Math.cos(el) * Math.sin(az));
     }
     // éclairage de nuit : celui du thème s'il en définit un (Cyberpunk : ambiance violette plus lumineuse)
@@ -951,6 +967,16 @@ export class CityRenderer {
     if (this.cloudMat) this.cloudMat.color.set('#ffffff').lerp(new THREE.Color('#5d6672'), w).lerp(bolt, 0.5 * fl);
     // la pluie est plus sombre la nuit (sinon elle paraît blanche, et le halo des beaux shaders l'épaissit)
     this.weather.rain.material.color.set('#cfe0f5').lerp(new THREE.Color('#46536a'), 0.85 * k);
+    // ciel des shaders « Fou » : l'horizon a la teinte du brouillard, le zénith est plus profond ; étoiles et
+    // aurore n'apparaissent qu'une fois la nuit bien installée
+    const S = this.sky.u;
+    S.uHorizon.value.copy(sky);
+    S.uTop.value.copy(sky).lerp(new THREE.Color('#2f7fe0').lerp(new THREE.Color('#01030a'), k), 0.72).lerp(grey, cover * 0.8);
+    S.uSunDir.value.copy(this.sun.position).normalize();
+    S.uSunCol.value.copy(this.sun.color).multiplyScalar(1 - 0.45 * k);
+    S.uNight.value = Math.max(0, Math.min(1, (k - 0.4) / 0.6));
+    S.uCover.value = w;
+    S.uFlash.value = fl;
   }
 
   // --- Interaction
@@ -1049,6 +1075,7 @@ export class CityRenderer {
     const wetGoal = this.weather.amount > 0.05 ? Math.min(1, this.weather.amount * 1.4) : 0, wetNow = this.wetU.value;
     this.wetU.value += Math.sign(wetGoal - wetNow) * Math.min(Math.abs(wetGoal - wetNow), dt * (wetGoal > wetNow ? 0.3 : 0.07));
     this.rainU.value = this.weather.amount;
+    this.sky.u.uTime.value += dt;
     if (wxMoved && this.city) this._applyNight(true);
     if (this.city) {
       const cyc = this.dayCycle;
